@@ -7,7 +7,7 @@ import { JSX, useCallback, useEffect, useMemo, useState } from 'react';
 import { Layout } from 'antd';
 import Modal from 'antd/es/modal/Modal';
 
-const headerHeight = 60;
+const headerHeight = 120;
 const footerHeight = 50;
 
 type InputProps = {

@@ -1,6 +1,6 @@
 import { memo, useMemo } from 'react';
 import { Content } from 'antd/es/layout/layout';
-import massbankLogo from '../../../../assets/logo.svg';
+import massbankLogo from '../../../../assets/rippository_logo.png';
 import { usePropertiesContext } from '../../../../context/properties/properties';
 import FreeText from '../../../basic/FreeText';
 
@@ -23,7 +23,7 @@ function MassBankInfo() {
         <img
           src={massbankLogo}
           style={{
-            height: 70,
+            height: 200,
             marginTop: 10,
             marginBottom: 40,
           }}

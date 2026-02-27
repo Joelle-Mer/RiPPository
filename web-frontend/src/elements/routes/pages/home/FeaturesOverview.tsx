@@ -15,7 +15,7 @@ function FeaturesOverview() {
       'Compound Search',
       'Spectral Search',
       'Structure Search',
-      'MassBank API',
+      'RiPPository API',
     ];
     return (
       <Content
@@ -43,8 +43,8 @@ function FeaturesOverview() {
             }}
           >
             <Text>
-              The MassBank system provides a variety of functionalities to
-              access, filter and search for data within its knowledge base. The
+              The RiPPository system provides a variety of functionalities to
+              access, filter and search for RiPP data within its knowledge base. The
               following key features are available.
             </Text>
           </Paragraph>
@@ -86,26 +86,6 @@ function FeaturesOverview() {
             }}
             alt="A mass spectrum with a magnifying glass and a chemical structure as result from spectral search."
           />
-        </Content>
-        <Content
-          style={{
-            width: '100%',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          <Text>
-            Visit the MassBank{' '}
-            <a
-              href={backendUrl}
-              target="_blank"
-              style={{ color: 'black', textDecoration: 'underline' }}
-            >
-              API documentation
-            </a>{' '}
-            to learn more about available endpoints and how to use them.
-          </Text>
         </Content>
       </Content>
     );

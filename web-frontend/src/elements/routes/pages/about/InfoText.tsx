@@ -2,7 +2,7 @@ import { Content } from 'antd/es/layout/layout';
 import Paragraph from 'antd/es/typography/Paragraph';
 import { memo } from 'react';
 
-import massbankLogo from '../../../../assets/logo_without_subtext.svg';
+import massbankLogo from '../../../../assets/rippository_logo.png';
 
 function InfoText() {
   return (
@@ -17,7 +17,7 @@ function InfoText() {
     >
       <img
         src={massbankLogo}
-        style={{ width: 300, marginTop: 10, marginBottom: 10 }}
+        style={{ width: 500, marginTop: 10, marginBottom: 10 }}
         key={'massbank-logo-overview'}
         alt="MassBank logo"
       />

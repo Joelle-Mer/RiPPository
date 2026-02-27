@@ -26,7 +26,7 @@ function HomeView() {
   elements.push(statusMessage);
 
   elements.push(<MassBankInfo />);
-  elementLabels.push('MassBank');
+  elementLabels.push('RiPPository');
   elements.push(
     <Content>
       <SectionDivider label="Features" />

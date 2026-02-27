@@ -3,7 +3,7 @@ import { Button } from 'antd';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { usePropertiesContext } from '../../context/properties/properties';
 import { CSSProperties, useMemo } from 'react';
-import logo from '../../assets/logo.svg';
+import logo from '../../assets/rippository_logo.png';
 import AccessionSearchInputField from '../common/AccessionSearchInputField';
 import HeaderTemplate from '../basic/HeaderTemplate';
 import MenuItem from '../../types/MenuItem';
