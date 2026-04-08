@@ -644,7 +644,19 @@ func (c *DefaultAPIController) GetSimilarity(w http.ResponseWriter, r *http.Requ
 	if query.Has("reference_spectra_list") {
 		referenceSpectraListParam = strings.Split(query.Get("reference_spectra_list"), ",")
 	}
-	result, err := c.service.GetSimilarity(r.Context(), peakListParam, peakListThresholdParam, referenceSpectraListParam)
+	var precursorMzParam float64
+	if query.Has("precursor_mz") {
+		param, err := parseNumericParameter[float64](
+			query.Get("precursor_mz"),
+			WithParse[float64](parseFloat64),
+		)
+		if err != nil {
+			c.errorHandler(w, r, &ParsingError{Param: "precursor_mz", Err: err}, nil)
+			return
+		}
+		precursorMzParam = param
+	}
+	result, err := c.service.GetSimilarity(r.Context(), peakListParam, peakListThresholdParam, referenceSpectraListParam, precursorMzParam)
 	// If an error occurred, encode the error with the status code
 	if err != nil {
 		c.errorHandler(w, r, err, &result)

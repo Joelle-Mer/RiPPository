@@ -99,7 +99,8 @@ function Segmented({
             display: 'block',
             justifyContent: 'center',
             alignItems: 'center',
-            overflow: 'scroll',
+            overflowY: 'auto',
+            overflowX: 'hidden',
             backgroundColor: 'white',
           }}
         >

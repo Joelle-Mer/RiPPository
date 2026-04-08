@@ -1,12 +1,12 @@
 import FileSaver from 'file-saver';
-import fetchRawMassBankRecord from './fetchRawMassBankRecord';
+import fetchRawRecord from './fetchRawMassBankRecord';
 const { saveAs } = FileSaver;
 
-async function downloadRawMassBankRecord(
+async function downloadRawRecord(
   exportServiceUrl: string,
   accession: string,
 ) {
-  const data = await fetchRawMassBankRecord(exportServiceUrl, accession);
+  const data = await fetchRawRecord(exportServiceUrl, accession);
   if (data !== null) {
     const filename = accession + '.txt';
     const blob = new Blob([data], {
@@ -15,9 +15,9 @@ async function downloadRawMassBankRecord(
     saveAs(blob, filename);
   } else {
     console.error(
-      'Could not fetch raw MassBank record for accession ' + accession,
+      'Could not fetch raw record for accession ' + accession,
     );
   }
 }
 
-export default downloadRawMassBankRecord;
+export default downloadRawRecord;

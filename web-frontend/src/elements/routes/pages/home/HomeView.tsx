@@ -1,15 +1,14 @@
 import Layout, { Content } from 'antd/es/layout/layout';
 import { JSX, memo } from 'react';
-import News from '../../../common/News';
 import SectionDivider from '../../../basic/SectionDivider';
 import AcknowledgementNFDI4Chem from '../../../common/AcknowledgementNFDI4Chem';
 import Segmented from '../../../basic/Segmented';
-import QuickSearch from './QuickSearch';
-import MassBankInfo from './MassBankInfo';
+import RiPPositoryInfo from './MassBankInfo';
 import FeaturesOverview from './FeaturesOverview';
 import { usePropertiesContext } from '../../../../context/properties/properties';
 import FreeText from '../../../basic/FreeText';
-import StatusMessage from './StatusMessage';
+
+import InfoText from '../about/InfoText';
 
 function HomeView() {
   const {
@@ -22,11 +21,10 @@ function HomeView() {
   const elements: JSX.Element[] = [];
   const elementLabels: string[] = [];
 
-  const statusMessage = <StatusMessage />;
-  elements.push(statusMessage);
-
-  elements.push(<MassBankInfo />);
+  elements.push(<RiPPositoryInfo />);
   elementLabels.push('RiPPository');
+  elements.push(<InfoText />);
+  elementLabels.push('About');
   elements.push(
     <Content>
       <SectionDivider label="Features" />
@@ -34,14 +32,6 @@ function HomeView() {
     </Content>,
   );
   elementLabels.push('Features');
-  elements.push(
-    <Content>
-      <SectionDivider label="Quick Search" />
-      <QuickSearch />
-    </Content>,
-  );
-  elementLabels.push('Quick Search');
-
   if (homepageNewsSectionText !== '') {
     if (homepageNewsSectionText !== 'disabled') {
       elements.push(
@@ -55,14 +45,6 @@ function HomeView() {
       );
       elementLabels.push('Latest News');
     }
-  } else {
-    elements.push(
-      <Content>
-        <SectionDivider label="Latest News" />
-        <News />
-      </Content>,
-    );
-    elementLabels.push('Latest News');
   }
 
   if (homepageFundingSectionText !== '') {

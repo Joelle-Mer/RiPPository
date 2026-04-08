@@ -39,6 +39,11 @@ function buildSearchParamsFromFormData(formData: SearchFields) {
     const peakListThreshold =
       formData.spectralSearchFilterOptions?.similarity?.threshold ?? 0;
     builtSearchParams['peak_list_threshold'] = [String(peakListThreshold)];
+    const precursorMz =
+      formData.spectralSearchFilterOptions?.similarity?.precursorMz;
+    if (precursorMz && precursorMz > 0) {
+      builtSearchParams['precursor_mz'] = [String(precursorMz)];
+    }
   }
 
   const peaks = (

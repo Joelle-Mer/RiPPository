@@ -5,6 +5,7 @@ import LinksTable from './LinksTable';
 import { Content } from 'antd/es/layout/layout';
 import ExportableContent from '../common/ExportableContent';
 import copyTextToClipboard from '../../utils/copyTextToClipboard';
+import NotAvailableLabel from '../basic/NotAvailableLabel';
 
 type InputProps = {
   species: Species | undefined;
@@ -41,67 +42,21 @@ function SpeciesTable({ species, width, height }: InputProps) {
             onClick={() => copyTextToClipboard('Species Name', species.name)}
           />
         ) : (
-          ''
+          <NotAvailableLabel />
         ),
       },
       {
         key: '2',
-        parameter: 'Lineage',
-        value: species?.lineage ? (
-          <Content
-            style={{
-              width: '100%',
-              height: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-          >
-            {species.lineage.map((lineage, index) => (
-              <ExportableContent
-                key={'record-view-species-lineage-' + index}
-                mode="copy"
-                component={lineage}
-                title={`Copy species lineage ${index + 1} to clipboard`}
-                onClick={() =>
-                  copyTextToClipboard(`Species Lineage ${index + 1}`, lineage)
-                }
-              />
-            ))}
-          </Content>
+        parameter: 'Strain',
+        value: species?.strain ? (
+          <ExportableContent
+            mode="copy"
+            component={species.strain}
+            title="Copy strain to clipboard"
+            onClick={() => copyTextToClipboard('Strain', species.strain!)}
+          />
         ) : (
-          ''
-        ),
-      },
-      {
-        key: '3',
-        parameter: 'Sample',
-        value: species?.sample ? (
-          <Content
-            style={{
-              width: '100%',
-              height: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-          >
-            {species.sample.map((sample, index) => (
-              <ExportableContent
-                key={'record-view-species-lineage-' + index}
-                mode="copy"
-                component={sample}
-                title={`Copy species sample ${index + 1} to clipboard`}
-                onClick={() =>
-                  copyTextToClipboard(`Species Sample ${index + 1}`, sample)
-                }
-              />
-            ))}
-          </Content>
-        ) : (
-          ''
+          <NotAvailableLabel />
         ),
       },
     ];

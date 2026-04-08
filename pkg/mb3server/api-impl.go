@@ -722,7 +722,7 @@ func GetSearchResults(contributor []string, instrumentType []string, msType []st
 	checkSimilarity := len(peakList) > 0 && peakList[0] != ""
 	if checkSimilarity {
 		// fmt.Println(" -> filter by Similarity")
-		similaritySearchResult, err = GetSimilarity(peakList, peakListThreshold, []string{})
+		similaritySearchResult, err = GetSimilarity(peakList, peakListThreshold, []string{}, 0)
 		if err != nil {
 			return nil, err
 		}
@@ -1045,7 +1045,7 @@ func getEnv(name string, fallback string) string {
 	return fallback
 }
 
-func GetSimilarity(peakList []string, threshold float64, referenceSpectraList []string) (*SimilaritySearchResult, error) {
+func GetSimilarity(peakList []string, threshold float64, referenceSpectraList []string, precursorMz float64) (*SimilaritySearchResult, error) {
 	sort.Slice(peakList, func(i, j int) bool {
 		split1 := strings.Split(peakList[i], ";")
 		split2 := strings.Split(peakList[j], ";")
@@ -1094,6 +1094,7 @@ func GetSimilarity(peakList []string, threshold float64, referenceSpectraList []
 	type datatype2 struct {
 		PeakList             []datatype1 `json:"peak_list"`
 		ReferenceSpectraList []string    `json:"reference_spectra_list"`
+		PrecursorMz          *float64    `json:"precursor_mz,omitempty"`
 	}
 
 	data := datatype2{}
@@ -1102,6 +1103,9 @@ func GetSimilarity(peakList []string, threshold float64, referenceSpectraList []
 		data.ReferenceSpectraList = []string{}
 	} else {
 		data.ReferenceSpectraList = referenceSpectraList
+	}
+	if precursorMz > 0 {
+		data.PrecursorMz = &precursorMz
 	}
 
 	b := new(bytes.Buffer)

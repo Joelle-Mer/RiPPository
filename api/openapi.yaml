@@ -234,6 +234,7 @@ paths:
       - $ref: "./schemas/SimilaritySearchParams.yaml#/components/parameters/PeakList"
       - $ref: "./schemas/SimilaritySearchParams.yaml#/components/parameters/PeakListThreshold"
       - $ref: "./schemas/SimilaritySearchParams.yaml#/components/parameters/ReferenceSpectraList"
+      - $ref: "./schemas/SimilaritySearchParams.yaml#/components/parameters/PrecursorMz"
     get:
       summary: Get a list of records with similarity scores.
       operationId: getSimilarity

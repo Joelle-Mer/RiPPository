@@ -1,6 +1,6 @@
 import './CommonSearchPanel.scss';
 
-import { CSSProperties, useCallback, useEffect, useMemo } from 'react';
+import { CSSProperties, ReactNode, useCallback, useEffect, useMemo } from 'react';
 
 import type { FormProps } from 'antd';
 import { Button } from 'antd';
@@ -25,7 +25,10 @@ type InputProps = {
   propertyFilterOptions: ContentFilterOptions | null;
   onCollapse: (collapsed: boolean) => void;
   onSubmit: (data: SearchFields) => void;
+  onValuesChange?: (allValues: SearchFields) => void;
   disableActiveKeys?: boolean;
+  hideSearchButton?: boolean;
+  footer?: ReactNode;
 };
 
 function CommonSearchPanel({
@@ -37,7 +40,10 @@ function CommonSearchPanel({
   propertyFilterOptions,
   onCollapse,
   onSubmit,
+  onValuesChange,
   disableActiveKeys = false,
+  hideSearchButton = false,
+  footer,
 }: InputProps) {
   const [form] = useForm<SearchFields>();
   const { setFieldValue, setFieldsValue } = form;
@@ -126,18 +132,42 @@ function CommonSearchPanel({
             {collapsed ? <RightOutlined /> : <LeftOutlined />}
           </Button>
         </Content>
-        <SearchPanelForm
-          form={form}
-          items={items}
-          initialValues={initialValues}
-          onSubmit={handleOnSubmit}
-          collapsed={collapsed}
-          width={width}
-          height={height}
-          collapseButtonWidth={collapseButtonWidth}
-          defaultOpenKeys={activeKeys}
-          defaultSelectedKeys={activeKeys}
-        />
+        <div
+          style={{
+            flex: 1,
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}
+        >
+          <SearchPanelForm
+            form={form}
+            items={items}
+            initialValues={initialValues}
+            onSubmit={handleOnSubmit}
+            onValuesChange={onValuesChange}
+            collapsed={collapsed}
+            width={width}
+            height={height}
+            collapseButtonWidth={collapseButtonWidth}
+            defaultOpenKeys={activeKeys}
+            defaultSelectedKeys={activeKeys}
+            hideSearchButton={hideSearchButton}
+          />
+          {footer && !collapsed && (
+            <div
+              style={{
+                borderTop: '1px solid #e5e7eb',
+                backgroundColor: '#fafafa',
+                padding: '10px 12px',
+                flexShrink: 0,
+              }}
+            >
+              {footer}
+            </div>
+          )}
+        </div>
       </Content>
     ),
     [
@@ -147,9 +177,12 @@ function CommonSearchPanel({
       collapsed,
       initialValues,
       handleOnSubmit,
+      onValuesChange,
       items,
       activeKeys,
       handleOnCollapse,
+      hideSearchButton,
+      footer,
     ],
   );
 }

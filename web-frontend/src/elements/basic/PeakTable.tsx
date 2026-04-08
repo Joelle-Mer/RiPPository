@@ -10,18 +10,24 @@ const columns = [
     dataIndex: 'mz',
     key: 'mz',
     align: 'center' as const,
+    sorter: (a: PeakTableDataType, b: PeakTableDataType) =>
+      parseFloat(a.mz) - parseFloat(b.mz),
   },
   {
     title: 'Intensity',
     dataIndex: 'intensity',
     key: 'intensity',
     align: 'center' as const,
+    sorter: (a: PeakTableDataType, b: PeakTableDataType) =>
+      parseFloat(a.intensity) - parseFloat(b.intensity),
   },
   {
     title: 'Rel. Int.',
     dataIndex: 'rel',
     key: 'rel',
     align: 'center' as const,
+    sorter: (a: PeakTableDataType, b: PeakTableDataType) =>
+      a.rel - b.rel,
   },
 ];
 

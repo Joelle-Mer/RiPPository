@@ -1,210 +1,71 @@
-[![codecov](https://codecov.io/github/MassBank/MassBank3/branch/main/graph/badge.svg?token=POWC3ZZAST)](https://codecov.io/github/MassBank/MassBank3)
-![go-test](https://github.com/MassBank/MassBank3/actions/workflows/go-test.yml/badge.svg)
+# RiPPository
 
-# MassBank3
+RiPPository is an open-source spectral library dedicated to the identification of ribosomally synthesized and post-translationally modified peptides (RiPPs). It provides a curated collection of high-resolution mass spectrometry data for RiPP natural products, enabling systematic dereplication and discovery of novel bioactive peptides.
 
-MassBank3 is the spectral reference library's next generation software product. The system consists of a modern software architecture and provides a new REST API with different services and a completely redesigned user interface.
+RiPPository is developed and maintained at Leiden University and Wageningen University & Research.
 
-This software is running at https://massbank.eu. It also provides a [graphical interface](https://massbank.eu/MassBank-api) using Swagger UI to get insights into the different REST API endpoints and their specifications.
+**GitHub:** https://github.com/Joelle-Mer/RiPPository
 
-There is a parallel instance at https://msbi.ipb-halle.de/MassBank. You can find the API's graphical interface [here](https://msbi.ipb-halle.de/MassBank-api/ui/).
+## Contact
 
-# Citation
+**Joelle Mergola Greef**
+Leiden University / Wageningen University & Research
+- mergolagreefj@vuw.leidenuniv.nl
+- joelle.mergolagreef@wur.nl
 
-Please cite MassBank using the following reference:
+For bug reports and data issues, please use the [GitHub issue tracker](https://github.com/Joelle-Mer/RiPPository/issues).
 
-    Steffen Neumann, René Meier, Michael Wenk, Anjana Elapavalore, Takaaki Nishioka, Tobias Schulze, Michael Stravs, Hiroshi Tsugawa, Fumio Matsuda, Emma L Schymanski, MassBank: an open and FAIR mass spectral data resource, Nucleic Acids Research, 2025;, gkaf1193, https://doi.org/10.1093/nar/gkaf1193
+## Origin
 
-# Installation
+RiPPository is built on the [MassBank](https://massbank.eu) platform and derived from the [MassBank-web](https://github.com/MassBank/MassBank-web) open-source project (GNU GPL v2). It extends the MassBank infrastructure with RiPP-specific features including biosynthetic gene cluster (BGC) metadata and MiBIG integration.
 
-There are currently two ways to run MassBank:
+## Citation
+
+If you use RiPPository in your research, please cite:
+
+> Mergola Greef, J. RiPPository: an open-access spectral library for ribosomally synthesized and post-translationally modified peptides (RiPPs). Leiden University & Wageningen University & Research. https://github.com/Joelle-Mer/RiPPository
+
+## Installation
+
+There are currently two ways to run RiPPository:
 
 1. Docker Compose
 2. Kubernetes/Helm Charts
 
-## Docker Compose
+### Docker Compose
 
-### Basic Settings
+Make sure that Docker and Docker Compose are installed and ready to use.
 
-Make sure that Docker and Docker Compose are installed on your computer and ready to use.
+Clone the repository:
 
-Then clone the repository:
+    git clone https://github.com/Joelle-Mer/RiPPository.git
 
-    git clone https://github.com/MassBank/MassBank3.git
+The directory _compose_ contains the _env.dist_ file which serves as a template for environment variables. Copy it to _.env_:
 
-The directory _MassBank/compose_ contains the _env.dist_ file which serves as a template for environment variables. The system expects an _.env_ file in that directory.
+    cd RiPPository/compose && cp env.dist .env
 
-So navigate to that directory and copy the _env.dist_ file into a new _.env_ file.
+Download the latest RiPPository data release and place it in the data directory:
 
-    cd MassBank3/compose && \
-    cp env.dist .env
+    mkdir ../data && wget https://github.com/Joelle-Mer/RiPPository/releases/latest/download/data.tar.gz && tar -xf data.tar.gz -C ../data/ && rm data.tar.gz
 
-The default structure of the _data_ folder looks like the following:
-
-    /MassBank3
-    |---...
-    |---/compose
-    |---/data
-        |---/MassBank-data
-    |---...
-
-"/MassBank3/data/MassBank-data" is the default directory to store the MassBank data in record file format needed import data to different services and can be set via _MB_DATA_DIRECTORY_.
-
-And in order to provide the MassBank data to the services, download the latest release of MassBank data, unpack it and move the contributor's directories into _data_ directoy (default):
-
-    mkdir ../data && \
-    wget https://github.com/MassBank/MassBank-data/archive/refs/heads/main.tar.gz && \
-    tar -xf main.tar.gz && \
-    mv MassBank-data-main ../data/MassBank-data/ && \
-    rm main.tar.gz
-
-Now use _docker compose_ to start the system (in daemon mode):
+Start the system:
 
     docker compose up -d
 
-> [!NOTE]
-> Initially, the property _MB_DB_INIT_ is set to _true_. Change that value to _false_ after the database was filled within the first start. The database filling takes some time (circa 30 minutes on Apple's M3 Pro chip and a Docker environment with 4 CPUs and 8GB RAM allowed). The _mb3tool_ service is responsible for that and stops running after finishing that task. Meanwhile you can check the amount of already imported data via the content page (frontend) or via following command line:
+> **Note:** On first start, the property _MB_DB_INIT_ is set to _true_. Change it to _false_ after the database has been populated.
 
-    curl http://localhost:8081/MassBank-api/records/count
-
-To stop the system use:
+Stop the system:
 
     docker compose down
 
-> [!NOTE]
-> Docker volumes are used for database storage and persistency. In order to remove these volumes and hence the data, use the previous command with _-v_. Set the property _MB_DB_INIT_ to _true_ again before restarting the system after deleting the volumes and data.
-
-### Advanced Settings
-
-#### Add Custom MassBank Data
-
-It's possible to add custom MassBank record data to your own MassBank instance. Simply add your MassBank files as subdirectory (or multiple directories) to the directory which was previously set via _MB_DATA_DIRECTORY_ (default is "/MassBank3/data/MassBank-data").
-
-> [!NOTE]
-> The MassBank files need to be in the specified MassBank format. That means, every file should contain its own accession ID, peaks etc., see [MassBank Record Format](https://github.com/MassBank/MassBank-web/blob/main/Documentation/MassBankRecordFormat.md). In addition, each file name should contain the same accession ID and end with „.txt“, e.g. "MSBNK-IPB_Halle-PB001341.txt".
-
-#### Distributor's Information
-
-The _DISTRIBUTOR_TEXT_ property is a free text field to insert any description of the distributor of a running MassBank instance.
-
-And _DISTRIBUTOR_URL_ should contain the URL to the distributor's imprint/website.
-
-#### Title in Browser Tab
-
-To customise the title in the web browser change the _MB3_FRONTEND_BROWSER_TAB_TITLE_ property.
-
-#### Introduction/Welcome Text
-
-A substitution of the text below the MassBank logo on the homepage is possible via editing _MB3_FRONTEND_HOMEPAGE_INTRO_TEXT_.
-
-#### Overwrite/Disable the News and Funding Section on Homepage
-
-Both _MB3_FRONTEND_HOMEPAGE_NEWS_SECTION_TEXT_ and _MB3_FRONTEND_HOMEPAGE_FUNDING_SECTION_TEXT_ can be non-empty strings to replace the news and funding section content on the homepage with a free text. Set the value "disabled" to disable a section.
-
-#### Add additional Section to Homepage
-
-To enable a custom section with free text content set the variable _MB3_FRONTEND_HOMEPAGE_ADDITIONAL_SECTION_NAME_ and _MB3_FRONTEND_HOMEPAGE_ADDITIONAL_SECTION_TEXT_. As the names indicate, the first stands for the section name while the latter is the text to fill that section.
-
-#### Extended HTML Head and Body
-
-##### Head File
-
-This optional feature enables to import of custom content in every webpage's HTML head of MassBank. This can be useful for the verification of your MassBank instance by Google search console or Bing, for example, or if the import of external libraries is needed when executing custom HTML body file content (see below).
-
-If the _.env_ file contains a non-empty _HTML_HEAD_FILE_ property then its file content will be included in the head section of every HTML document of the web interface.
-
-##### Body File
-
-This optional feature enables the import of custom content in every webpage's HTML body of MassBank. This feature can be useful to implement a customised data privacy management, e.g. tracking. To display a data privacy section in every webpage's footer, the root element needs to have the id "_data-privacy-container_".
-
-If the _.env_ file contains a non-empty _HTML_BODY_FILE_ property then its file content will be included in the body section of every HTML document of the web interface to enable the data privacy management button. The HTML file content is responsible for what is shown in the graphical interface and for the executed code. The MassBank implementation does not influence or control that.
-
-##### Mount Local Directory
-
-In order to mount the HTML files, the variable _HTML_LOCAL_DIR_ needs to be set to a local directory. For example in the root of the project.
-
-Additionally, the volume needs to be mounted. Therefore, firstly, the directory (_HTML_LOCAL_DIR_) needs to be created and contain the head or both HTML files. Secondly, the _volumes_ tag in the frontend section in the docker-compose file has to be re-activated.
-
-### Troubleshooting
-
-In case your system is different from linux/amd64 then a warning might appear after starting docker compose:
-
-    The requested image's platform (linux/amd64) does not match the detected host platform (linux/arm64/v8) and no specific platform was requested
-
-Add the following properties to _postgres_, _similarity-service_ and _export-service_ in the _docker-compose.yaml_ file to solve that problem:
-
-    platform: linux/amd64
-
-## Kubernetes/Helm Charts
+### Kubernetes/Helm Charts
 
 A description is available at https://github.com/MassBank/MassBank-charts.
 
-# Frontend
+## Frontend
 
-The frontend can by default be accessed in the webbrowser at http://localhost:8080/MassBank and is composed via:
+The frontend is accessible at http://localhost:8080/RiPPository by default.
 
-    http://${MB3_FRONTEND_HOST}:${MB3_FRONTEND_PORT}${MB3_FRONTEND_BASE_URL}
+## License
 
-# REST API
-
-To access this on your running instance, just visit the API URL in the browser. By default it is http://localhost:8081/MassBank-api and is defined by the environment variable _MB3_API_URL_ and concatenated via:
-
-    http://${MB3_API_HOST}:${MB3_API_PORT}${MB3_API_BASE_URL}
-
-## Examples
-
-### _/records_ Endpoint
-
-#### InChIKey
-
-In order to get all records from the running instance at the API URL with an InChIKey of _KWILGNNWGSNMPA-UHFFFAOYSA-N_ call the following URL:
-
-    {MB3_API_URL}/records?inchi_key=KWILGNNWGSNMPA-UHFFFAOYSA-N
-
-The corresponding URL with default value (http://localhost:8081/MassBank-api) is:
-
-    http://localhost:8081/MassBank-api/records?inchi_key=KWILGNNWGSNMPA-UHFFFAOYSA-N
-
-For example, to obtain the results via cURL use:
-
-    curl -X GET "http://localhost:8081/MassBank-api/records?inchi_key=KWILGNNWGSNMPA-UHFFFAOYSA-N"
-
-The result is a set of complete MassBank records in JSON format.
-
-#### Compound Name
-
-To receive all records to the compound name _mellein_ use:
-
-    http://localhost:8081/MassBank-api/records?compound_name=mellein
-
-### _/records/search_ Endpoint
-
-#### Compound Class
-
-To receive all accession belonging to the compound class _natural product_ use:
-
-    http://localhost:8081/MassBank-api/records/search?compound_class=natural+product
-
-The result is a set of MassBank record IDs (accessions).
-
-#### MS Type and Ion Mode
-
-A request for searching MS2 spectra and negative ion mode looks like:
-
-    http://localhost:8081/MassBank-api/records/search?ms_type=MS2&ion_mode=NEGATIVE
-
-#### Similarity Search
-
-A similarity search request with the semicolon-separated tuples (m/z value, rel. intensity)
-
-    133.0648;225
-    151.0754;94
-    155.9743;112
-    161.0597;999
-    179.0703;750
-
-and threshold value 0.8 looks like:
-
-    http://localhost:8081/MassBank-api/records/search?peak_list=133.0648%3B225%2C151.0754%3B94%2C155.9743%3B112%2C161.0597%3B999%2C179.0703%3B750&peak_list_threshold=0.8
-
-The result is a set of MassBank record IDs (accessions) and the corresponding similarity score in JSON format. The calculation is done by the [matchms](https://github.com/matchms/matchms) package used in our [similarity service](https://github.com/MassBank/MassBank3-similarity-service).
+Spectral records are released under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) unless otherwise stated. Source code is licensed under the GNU General Public License v2, inherited from MassBank-web.

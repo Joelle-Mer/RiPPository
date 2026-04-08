@@ -65,3 +65,7 @@ components:
         type: string
     Substructure:
       type: string
+    PrecursorMz:
+      type: number
+      format: double
+      description: "The precursor m/z of the query spectrum, required for modified cosine similarity search."

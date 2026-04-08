@@ -28,7 +28,7 @@ async function downloadRecords(
     const filename =
       accessions.length === 1
         ? `${accessions[0]}.${format}.${fileType}`
-        : `massbank_result.${format}.${fileType}`;
+        : `rippository_result.${format}.${fileType}`;
     const blob = new Blob([data], {
       type: format === 'massbank' ? 'application/zip' : 'text/plain',
     });

@@ -1,0 +1,4 @@
+fastapi
+uvicorn
+matchms>=0.24.0
+numpy

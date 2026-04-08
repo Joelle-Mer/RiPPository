@@ -132,7 +132,7 @@ function Acknowledgement() {
           }}
         >
           Standing on the shoulder of giants, we would like to acknowledge some
-          of the dependencies used in the MassBank system:
+          of the dependencies used in the RiPPository system:
         </Text>
         <List
           style={{ padding: 10 }}

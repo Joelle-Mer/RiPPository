@@ -1,43 +1,143 @@
-import { lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useContainerDimensions from '../../../../utils/useContainerDimensions';
-import fetchData from '../../../../utils/request/fetchData';
-import buildSearchParams from '../../../../utils/request/buildSearchParams';
-import initFlags from '../../../../utils/initFlags';
-import SearchResult from '../../../../types/SearchResult';
 import Hit from '../../../../types/Hit';
+import Peak from '../../../../types/peak/Peak';
 import ContentFilterOptions from '../../../../types/filterOptions/ContentFilterOtions';
-import { Layout, Spin } from 'antd';
+import { Form, Input, InputNumber, Layout, Spin, Typography } from 'antd';
 import { Content } from 'antd/es/layout/layout';
 import SearchFields from '../../../../types/filterOptions/SearchFields';
-import propertyFilterOptionsFormDataToContentMapper from '../../../../utils/propertyFilterOptionsFormDataToContentMapper';
 import SearchAndResultPanel from '../../../common/SearchAndResultPanel';
 import CommonSearchPanel from '../../../common/CommonSearchPanel';
 import PropertyFilterOptionsMenuItems from '../search/searchPanel/msSpecFilter/PropertyFilterOptionsMenuItems';
-import Placeholder from '../../../basic/Placeholder';
-import { usePropertiesContext } from '../../../../context/properties/properties';
-import SectionDivider from '../../../basic/SectionDivider';
-import MetadataPanel from './MetadataPanel';
-import Metadata from '../../../../types/Metadata';
 import defaultSearchFieldValues from '../../../../constants/defaultSearchFieldValues';
 import ResultTableSortOption from '../../../../types/ResultTableSortOption';
 import sortHits from '../../../../utils/sortHits';
 import collapseButtonWidth from '../../../../constants/collapseButtonWidth';
-import Segmented from '../../../basic/Segmented';
-import segmentedWidth from '../../../../constants/segmentedWidth';
-import buildClassificationData from '../../../../utils/buildClassificationData';
-import ClassificationPanel from './ClassificationPanel';
-import NotAvailableLabel from '../../../basic/NotAvailableLabel';
-import RequestResponse from '../../../../types/RequestResponse';
 import ErrorElement from '../../../basic/ErrorElement';
+import { SUBMISSIONS_KEY, RiPPSubmission } from '../submit/SubmitView';
+import { parsePeakList } from '../../../../utils/chemistry';
+import Chart from '../../../basic/Chart';
 
-const ContentChart = lazy(() => import('./ContentChart'));
-
+const { Text } = Typography;
 const defaultSearchPanelWidth = 450;
+
+function cosineSimilarity(
+  query: { mz: number; intensity: number }[],
+  target: { mz: number; intensity: number }[],
+  mzTol = 0.05,
+): number {
+  if (query.length === 0 || target.length === 0) return 0;
+  const normQ = Math.sqrt(query.reduce((s, p) => s + p.intensity * p.intensity, 0));
+  const normT = Math.sqrt(target.reduce((s, p) => s + p.intensity * p.intensity, 0));
+  if (normQ === 0 || normT === 0) return 0;
+  let dot = 0;
+  for (const q of query) {
+    let best = 0, bestDist = Infinity;
+    for (const t of target) {
+      const d = Math.abs(t.mz - q.mz);
+      if (d <= mzTol && d < bestDist) { best = t.intensity; bestDist = d; }
+    }
+    dot += q.intensity * best;
+  }
+  return dot / (normQ * normT);
+}
+
+function submissionToHit(sub: RiPPSubmission, idx: number): Hit {
+  const peaks = (sub.peaks ?? []).map((p, i) => ({ ...p, id: String(i) }));
+  return {
+    index: idx,
+    accession: sub.accession,
+    atomcount: 0,
+    record: {
+      accession: sub.accession,
+      title: sub.recordTitle,
+      date: { created: sub.date, modified: sub.date, updated: sub.date },
+      authors: [{ name: sub.orcidName ? `${sub.orcidName} (${sub.orcid})` : sub.orcid }],
+      publication: (sub.dois ?? []).join(', '),
+      license: sub.license,
+      copyright: '',
+      compound: {
+        names: [sub.compoundName],
+        classes: [sub.compoundClass],
+        formula: sub.formula,
+        mass: sub.exactMass ?? 0,
+        smiles: sub.smiles ?? '',
+        inchi: sub.inchi ?? '',
+        link: (sub.dbLinks ?? []).map((l) => ({ db: l.db, id: l.id, url: '' })),
+      },
+      species: {
+        name: sub.origin?.organism ?? '',
+        strain: sub.origin?.strain ?? undefined,
+        lineage: [],
+        link: [],
+        sample: sub.origin?.source ? [sub.origin.source] : [],
+      },
+      acquisition: {
+        instrument: sub.instrument,
+        instrument_type: sub.instrumentType,
+        chromatography: [],
+        mass_spectrometry: {
+          ion_mode: sub.ionMode,
+          ms_type: sub.msType,
+          subtags: [
+            ...(sub.collisionEnergy ? [{ subtag: 'COLLISION_ENERGY', value: sub.collisionEnergy }] : []),
+            ...(sub.ionization ? [{ subtag: 'IONIZATION', value: sub.ionization }] : []),
+          ],
+        },
+      },
+      mass_spectrometry: {
+        focused_ion: sub.precursorType
+          ? [{ subtag: 'PRECURSOR_TYPE', value: sub.precursorType }]
+          : [],
+        data_processing: [],
+      },
+      peak: {
+        splash: sub.splash ?? '',
+        numPeak: sub.numPeak,
+        peak: {
+          header: ['m/z', 'int.', 'rel.int.'],
+          values: peaks,
+        },
+        neutral_loss: [],
+      },
+      comments: [
+        ...(sub.bioactivity ?? []).map((b) => ({
+          subtag: 'BIOACTIVITY',
+          value: b.activity + (b.target ? ` (${b.target})` : ''),
+        })),
+        ...(sub.note ? [{ subtag: 'NOTE', value: sub.note }] : []),
+        ...(sub.genome?.mibig ? [{ subtag: 'MIBIG', value: sub.genome.mibig }] : []),
+      ],
+    },
+  } as Hit;
+}
+
+function getAllSubmissions(): RiPPSubmission[] {
+  try {
+    return JSON.parse(localStorage.getItem(SUBMISSIONS_KEY) ?? '[]');
+  } catch {
+    return [];
+  }
+}
+
+function buildFilterOptions(subs: RiPPSubmission[]): ContentFilterOptions {
+  const toCounts = (values: string[]): { value: string; count: number }[] => {
+    const map = new Map<string, number>();
+    values.forEach((v) => { if (v) map.set(v, (map.get(v) ?? 0) + 1); });
+    return Array.from(map.entries()).map(([value, count]) => ({ value, count }));
+  };
+  return {
+    contributor: [],
+    instrument_type: toCounts(subs.map((s) => s.instrumentType).filter(Boolean)),
+    ion_mode: toCounts(subs.map((s) => s.ionMode).filter(Boolean)),
+    ms_type: toCounts(subs.map((s) => s.msType).filter(Boolean)),
+    ripp_type: toCounts(subs.map((s) => s.compoundClass).filter(Boolean)),
+  };
+}
 
 function ContentView() {
   const ref = useRef(null);
   const { width, height } = useContainerDimensions(ref);
-  const { backendUrl } = usePropertiesContext();
 
   const [isFetchingContent, setIsFetchingContent] = useState<boolean>(false);
   const [isSearching, setIsSearching] = useState<boolean>(false);
@@ -46,176 +146,107 @@ function ContentView() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [propertyFilterOptions, setPropertyFilterOptions] =
     useState<ContentFilterOptions | null>(null);
-  const [metadata, setMetadata] = useState<Metadata | null>(null);
-  const [searchPanelWidth, setSearchPanelWidth] = useState<number>(
-    defaultSearchPanelWidth,
-  );
+  const [searchPanelWidth, setSearchPanelWidth] = useState<number>(defaultSearchPanelWidth);
+  const [queryPeaks, setQueryPeaks] = useState<Peak[] | null>(null);
 
-  const handleOnFetchContent = useCallback(
-    async (formDataContent: ContentFilterOptions | null) => {
-      setIsFetchingContent(true);
+  const handleOnFetchContent = useCallback(async () => {
+    const subs = getAllSubmissions();
+    setPropertyFilterOptions(buildFilterOptions(subs));
+    setIsFetchingContent(false);
+  }, []);
 
-      let _browseContent: ContentFilterOptions | null = formDataContent;
-      if (!_browseContent) {
-        const url = backendUrl + '/filter/browse';
-        const response = (await fetchData(
-          url,
-        )) as RequestResponse<ContentFilterOptions>;
+  /** Applies all active filters (property checkboxes + text inputs) and sets hits. */
+  const handleOnSubmit = useCallback(async (formData: SearchFields) => {
+    setIsSearching(true);
+    let subs = getAllSubmissions();
 
-        if (response.status === 'error') {
-          setErrorMessage(
-            'An error occurred while trying to check for filter options.',
-          );
-          _browseContent = null;
-        } else {
-          setErrorMessage(null);
-          _browseContent = response.data;
-        }
-      } else {
-        const searchParams = buildSearchParams(_browseContent);
-        const url = backendUrl + '/filter/browse';
-        const response = (await fetchData(
-          url,
-          searchParams,
-        )) as RequestResponse<ContentFilterOptions>;
-        if (response.status === 'error') {
-          setErrorMessage(
-            'An error occurred while trying to check for filter options.',
-          );
-          _browseContent = null;
-        } else {
-          setErrorMessage(null);
-          _browseContent = response.data;
-        }
-      }
-      if (_browseContent) {
-        initFlags(_browseContent);
-      }
+    // Checkbox property filters
+    const rippSelected = (formData?.propertyFilterOptions?.ripp_type ?? []) as string[];
+    const instrSelected = (formData?.propertyFilterOptions?.instrument_type ?? []) as string[];
+    const ionSelected = (formData?.propertyFilterOptions?.ion_mode ?? []) as string[];
+    const msSelected = (formData?.propertyFilterOptions?.ms_type ?? []) as string[];
+    if (rippSelected.length > 0) subs = subs.filter((s) => rippSelected.includes(s.compoundClass));
+    if (instrSelected.length > 0) subs = subs.filter((s) => instrSelected.includes(s.instrumentType));
+    if (ionSelected.length > 0) subs = subs.filter((s) => ionSelected.includes(s.ionMode));
+    if (msSelected.length > 0) subs = subs.filter((s) => msSelected.includes(s.msType));
 
-      setPropertyFilterOptions(_browseContent);
-
-      const url = backendUrl + '/metadata';
-      const response = (await fetchData(url)) as RequestResponse<Metadata>;
-      setMetadata(response.data ?? null);
-
-      setIsFetchingContent(false);
-    },
-    [backendUrl],
-  );
-
-  const handleOnSearch = useCallback(
-    async (formDataContent: ContentFilterOptions | null) => {
-      setIsSearching(true);
-
-      const searchParams = buildSearchParams(formDataContent);
-      const url = backendUrl + '/records/search';
-      const response = (await fetchData(
-        url,
-        searchParams,
-      )) as RequestResponse<SearchResult>;
-      const searchResult = response.data;
-
-      if (response.status === 'success') {
-        let _hits: Hit[] =
-          searchResult && searchResult.data ? (searchResult.data as Hit[]) : [];
-        _hits = _hits.map((hit, i) => {
-          return {
-            ...hit,
-            index: i,
-          };
-        });
-        setHits(_hits);
-        setErrorMessage(null);
-      } else {
-        setHits(null);
-        setErrorMessage(response.message);
-      }
-
-      setIsSearching(false);
-    },
-    [backendUrl],
-  );
-
-  const handleOnSubmit = useCallback(
-    async (formData: SearchFields) => {
-      // setIsCollapsed(true);
-      // setSearchPanelWidth(collapseButtonWidth);
-
-      const formDataContent = propertyFilterOptionsFormDataToContentMapper(
-        formData?.propertyFilterOptions,
-        undefined,
+    // Text filters (compound name / accession / formula)
+    const name = (formData?.compoundSearchFilterOptions?.compoundName ?? '').trim().toLowerCase();
+    const formula = (formData?.compoundSearchFilterOptions?.formula ?? '').trim().toLowerCase();
+    if (name) {
+      subs = subs.filter((s) =>
+        s.compoundName?.toLowerCase().includes(name) ||
+        s.accession?.toLowerCase().includes(name) ||
+        s.recordTitle?.toLowerCase().includes(name) ||
+        s.compoundClass?.toLowerCase().includes(name) ||
+        s.inchi?.toLowerCase().includes(name) ||
+        s.inchikey?.toLowerCase().includes(name) ||
+        s.precursorSeq?.toLowerCase().includes(name) ||
+        (s.dois ?? []).some((d) => d.toLowerCase().includes(name)) ||
+        s.origin?.organism?.toLowerCase().includes(name) ||
+        s.note?.toLowerCase().includes(name),
       );
-
-      await handleOnSearch(formDataContent);
-      await handleOnFetchContent(formDataContent);
-    },
-    [handleOnFetchContent, handleOnSearch],
-  );
-
-  useEffect(() => {
-    handleOnFetchContent(null);
-    handleOnSearch(null);
-  }, [handleOnFetchContent, handleOnSearch]);
-
-  const heights = useMemo(() => {
-    return {
-      chartPanelHeight: height * 0.9,
-      searchPanelHeight: height * 0.9,
-      classificationPanelHeight: height * 0.9,
-    };
-  }, [height]);
-
-  const charts = useMemo(() => {
-    if (propertyFilterOptions) {
-      const keys = Object.keys(propertyFilterOptions).filter(
-        (key) => key !== 'metadata',
-      );
-      const _charts = keys.map((key) => (
-        <ContentChart
-          key={'chart_' + key}
-          content={propertyFilterOptions}
-          identifier={key}
-          width={(width - segmentedWidth) / 2}
-          height={heights.chartPanelHeight / 2}
-        />
-      ));
-
-      return (
-        <Content
-          style={{
-            width: width - segmentedWidth,
-            height: heights.chartPanelHeight,
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            justifyContent: 'center',
-            alignItems: 'center',
-            textAlign: 'center',
-          }}
-        >
-          {_charts}
-        </Content>
+    }
+    if (formula) {
+      subs = subs.filter(
+        (s) =>
+          s.formula?.toLowerCase().includes(formula) ||
+          s.compoundName?.toLowerCase().includes(formula),
       );
     }
 
-    return (
-      <Placeholder
-        style={{
-          width,
-          height: heights.chartPanelHeight,
-          color: 'red',
-          fontSize: 18,
-          fontWeight: 'bold',
-        }}
-        child={''}
-      />
-    );
-  }, [heights.chartPanelHeight, propertyFilterOptions, width]);
+    // Monoisotopic mass filter
+    const exactMass = formData?.compoundSearchFilterOptions?.exactMass;
+    if (exactMass != null && !isNaN(exactMass)) {
+      const tol = formData?.compoundSearchFilterOptions?.massTolerance ?? 0.1;
+      subs = subs.filter((s) => Math.abs((s.exactMass ?? 0) - exactMass) <= tol);
+    }
+
+    // Spectral similarity filter
+    let similarityScores: Map<RiPPSubmission, number> | null = null;
+    const peakListRaw = (formData?.spectralSearchFilterOptions?.similarity?.peakList ?? '').trim();
+    if (peakListRaw) {
+      const parsed = parsePeakList(peakListRaw);
+      if (parsed && parsed.length > 0) {
+        const parsedPeaks: Peak[] = parsed.map((p, i) => ({ ...p, id: String(i) }));
+        setQueryPeaks(parsedPeaks);
+        const threshold = formData?.spectralSearchFilterOptions?.similarity?.threshold ?? 0.8;
+        const scored = subs
+          .map((s) => {
+            const targetPeaks = (s.peaks ?? []) as { mz: number; intensity: number }[];
+            const score = cosineSimilarity(parsed, targetPeaks);
+            return { sub: s, score };
+          })
+          .filter(({ score }) => score >= threshold)
+          .sort((a, b) => b.score - a.score);
+        subs = scored.map(({ sub }) => sub);
+        similarityScores = new Map(scored.map(({ sub, score }) => [sub, score]));
+      } else {
+        setQueryPeaks(null);
+      }
+    } else {
+      setQueryPeaks(null);
+    }
+
+    setHits(subs.map((s, i) => {
+      const hit = submissionToHit(s, i);
+      if (similarityScores) hit.score = similarityScores.get(s);
+      return hit;
+    }));
+    setErrorMessage(null);
+    setIsSearching(false);
+  }, []);
+
+  useEffect(() => {
+    handleOnFetchContent();
+    handleOnSubmit({} as SearchFields);
+  }, [handleOnFetchContent, handleOnSubmit]);
+
+  const searchPanelHeight = useMemo(() => height * 0.9, [height]);
 
   const handleOnCollapse = useCallback((_collapsed: boolean) => {
     setIsCollapsed(_collapsed);
-    setSearchPanelWidth(
-      _collapsed ? collapseButtonWidth : defaultSearchPanelWidth,
-    );
+    setSearchPanelWidth(_collapsed ? collapseButtonWidth : defaultSearchPanelWidth);
   }, []);
 
   const handleOnSelectSort = useCallback(
@@ -228,41 +259,152 @@ function ContentView() {
 
   const handleOnResize = useCallback(
     (_searchPanelWidth: number) => {
-      if (!isCollapsed) {
-        setSearchPanelWidth(_searchPanelWidth);
-      }
+      if (!isCollapsed) setSearchPanelWidth(_searchPanelWidth);
     },
     [isCollapsed],
   );
 
+  const initialFilterValues = useMemo<SearchFields>(
+    () => ({ ...(JSON.parse(JSON.stringify(defaultSearchFieldValues)) as SearchFields) }),
+    [],
+  );
+
+  // Text search form items at top of the filter panel — same pattern as Search page
+  const queryChartWidth = searchPanelWidth - 40;
+
+  const textSearchItems = useMemo(() => [
+    {
+      key: 'textSearch',
+      label: 'Search',
+      children: [
+        {
+          key: 'textSearchInputs',
+          style: { height: 'auto', paddingInline: 0 as const },
+          label: (
+            <div style={{ padding: '4px 8px 8px' }}>
+              <Form.Item
+                name={['compoundSearchFilterOptions', 'compoundName']}
+                label="Compound name"
+                style={{ marginBottom: 10 }}
+              >
+                <Input placeholder="e.g. Nisin A" allowClear />
+              </Form.Item>
+              <Form.Item
+                name={['compoundSearchFilterOptions', 'formula']}
+                label="Formula"
+                style={{ marginBottom: 10 }}
+              >
+                <Input placeholder="e.g. C143H230N42O37S7" allowClear />
+              </Form.Item>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
+                <Form.Item
+                  name={['compoundSearchFilterOptions', 'exactMass']}
+                  label="Exact mass (Da)"
+                  style={{ marginBottom: 0, flex: 1 }}
+                >
+                  <InputNumber
+                    placeholder="e.g. 3354.5"
+                    min={0}
+                    step={0.001}
+                    style={{ width: '100%' }}
+                  />
+                </Form.Item>
+                <Form.Item
+                  name={['compoundSearchFilterOptions', 'massTolerance']}
+                  label="±"
+                  style={{ marginBottom: 0, width: 72 }}
+                >
+                  <InputNumber min={0} step={0.01} style={{ width: '100%' }} />
+                </Form.Item>
+              </div>
+              {hits !== null && (
+                <Text type="secondary" style={{ fontSize: 11, marginTop: 8, display: 'block' }}>
+                  {hits.length} record{hits.length !== 1 ? 's' : ''} found
+                </Text>
+              )}
+            </div>
+          ),
+        },
+      ],
+    },
+    {
+      key: 'spectralSearch',
+      label: 'Spectral Similarity',
+      children: [
+        {
+          key: 'spectralSearchInputs',
+          style: { height: 'auto', paddingInline: 0 as const },
+          label: (
+            <div style={{ padding: '4px 8px 8px' }}>
+              <Form.Item
+                name={['spectralSearchFilterOptions', 'similarity', 'peakList']}
+                label="Peak list"
+                style={{ marginBottom: 10 }}
+                help="One peak per line: m/z intensity"
+              >
+                <Input.TextArea
+                  rows={5}
+                  placeholder={'100.05 500\n150.12 1000\n200.08 300'}
+                  style={{ fontFamily: 'monospace', fontSize: 11 }}
+                />
+              </Form.Item>
+              <Form.Item
+                name={['spectralSearchFilterOptions', 'similarity', 'threshold']}
+                label="Min. similarity"
+                style={{ marginBottom: queryPeaks ? 10 : 0 }}
+              >
+                <InputNumber min={0} max={1} step={0.05} style={{ width: '100%' }} />
+              </Form.Item>
+              {queryPeaks && queryPeaks.length > 0 && (
+                <div style={{ marginTop: 4 }}>
+                  <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>
+                    Query spectrum ({queryPeaks.length} peaks)
+                  </div>
+                  <Chart
+                    peakData={queryPeaks}
+                    width={queryChartWidth}
+                    height={120}
+                    disableZoom
+                    disableLabels
+                    disableOnHover
+                    disableExport
+                  />
+                </div>
+              )}
+            </div>
+          ),
+        },
+      ],
+    },
+  ], [hits, queryPeaks, queryChartWidth]);
+
   const searchAndResultPanel = useMemo(() => {
+    const filterItems = [
+      ...textSearchItems,
+      ...PropertyFilterOptionsMenuItems({ propertyFilterOptions, showCounts: true }),
+    ];
+
     const searchPanel = (
       <CommonSearchPanel
-        items={PropertyFilterOptionsMenuItems({
-          propertyFilterOptions,
-          showCounts: true,
-        })}
+        items={filterItems}
         collapsed={isCollapsed}
         onCollapse={handleOnCollapse}
         propertyFilterOptions={propertyFilterOptions}
         onSubmit={handleOnSubmit}
+        onValuesChange={handleOnSubmit}
         width={searchPanelWidth}
-        height={heights.searchPanelHeight}
-        initialValues={{
-          ...(JSON.parse(
-            JSON.stringify(defaultSearchFieldValues),
-          ) as SearchFields),
-          propertyFilterOptions: propertyFilterOptions ?? undefined,
-        }}
+        height={searchPanelHeight}
+        initialValues={initialFilterValues}
         disableActiveKeys={true}
+        hideSearchButton={true}
       />
     );
 
     return (
       <SearchAndResultPanel
         searchPanel={searchPanel}
-        width={width - segmentedWidth}
-        height={heights.searchPanelHeight}
+        width={width}
+        height={searchPanelHeight}
         searchPanelWidth={searchPanelWidth}
         widthOverview={width}
         heightOverview={height}
@@ -270,117 +412,31 @@ function ContentView() {
         isRequesting={isSearching}
         onSort={handleOnSelectSort}
         onResize={handleOnResize}
+        reference={queryPeaks ?? undefined}
       />
     );
   }, [
-    propertyFilterOptions,
-    isCollapsed,
-    handleOnCollapse,
-    handleOnSubmit,
-    searchPanelWidth,
-    heights.searchPanelHeight,
-    width,
-    height,
-    hits,
-    isSearching,
-    handleOnSelectSort,
-    handleOnResize,
+    textSearchItems, propertyFilterOptions, isCollapsed, handleOnCollapse, handleOnSubmit,
+    searchPanelWidth, searchPanelHeight, width, height, hits, isSearching,
+    handleOnSelectSort, handleOnResize, initialFilterValues, queryPeaks,
   ]);
 
-  return useMemo(() => {
-    const classificationData = buildClassificationData(
-      metadata?.compound_class_chemont ?? [],
-    );
-
-    const elements = [
-      searchAndResultPanel,
-      <Content>
-        <SectionDivider label="Charts (Selection)" />
-        {charts}
-      </Content>,
-      <Content>
-        <SectionDivider label="Classification (ChemOnt)" />
-        {classificationData.labels.length > 0 ? (
-          <ClassificationPanel
-            data={classificationData}
-            width={width - segmentedWidth}
-            height={heights.classificationPanelHeight}
-          />
-        ) : (
-          <Content
-            style={{
-              width: width - segmentedWidth,
-              height: 50,
-              display: 'flex',
-              justifyContent: 'left',
-              alignItems: 'center',
-              paddingLeft: 20,
-            }}
-          >
-            <NotAvailableLabel />
-          </Content>
-        )}
-      </Content>,
-      <Content>
-        <SectionDivider label="Information" />
-        <MetadataPanel metadata={metadata} />
-      </Content>,
-    ];
-    const elementLabels = [
-      'Filter',
-      'Charts',
-      'Compound Classes',
-      'Information',
-    ];
-
-    const content = (
-      <Content
-        style={{
-          width: '100%',
-          height: '100%',
-          display: isFetchingContent ? 'none' : 'block',
-          overflow: 'scroll',
-          justifyContent: 'center',
-          alignItems: 'center',
-          backgroundColor: 'white',
-        }}
-      >
-        <Segmented elements={elements} elementLabels={elementLabels} />
-      </Content>
-    );
-
-    return (
-      <Layout
-        ref={ref}
-        style={{
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          userSelect: 'none',
-        }}
-      >
-        {isFetchingContent ? (
-          <Spin size="large" />
-        ) : errorMessage ? (
-          <ErrorElement
-            message={'An error occurred while trying to fetch the content.'}
-          />
-        ) : (
-          content
-        )}
-      </Layout>
-    );
-  }, [
-    charts,
-    errorMessage,
-    heights.classificationPanelHeight,
-    isFetchingContent,
-    metadata,
-    searchAndResultPanel,
-    width,
-  ]);
+  return (
+    <Layout
+      ref={ref}
+      style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', userSelect: 'none' }}
+    >
+      {isFetchingContent ? (
+        <Spin size="large" />
+      ) : errorMessage && !hits ? (
+        <ErrorElement message={'An error occurred while trying to fetch the content.'} />
+      ) : (
+        <Content style={{ width: '100%', height: '100%', backgroundColor: 'white' }}>
+          {searchAndResultPanel}
+        </Content>
+      )}
+    </Layout>
+  );
 }
 
 export default ContentView;

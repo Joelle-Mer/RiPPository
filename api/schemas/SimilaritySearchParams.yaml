@@ -1,7 +1,7 @@
 components:
   parameters:
     PeakList:
-      description: "A list of tuples of m/z values and (relative) intensities used for similarity search. Both values in a tuple need to be separated by a semi-colon, e.g. '147.063;11'. The parameter 'peak_list_threshold' is required when using this filter option. This method uses the 'matchms' Python package and the CosineGreedy algorithm for similarity search."
+      description: "A list of tuples of m/z values and (relative) intensities used for similarity search. Both values in a tuple need to be separated by a semi-colon, e.g. '147.063;11'. The parameter 'peak_list_threshold' is required when using this filter option. This method uses the 'matchms' Python package and the ModifiedCosine algorithm for similarity search."
       in: query
       name: peak_list
       schema:
@@ -20,4 +20,11 @@ components:
       schema:
         $ref: "./FilterSchemas.yaml#/components/schemas/ReferenceSpectraList"
       explode: false
+      required: false
+    PrecursorMz:
+      description: "The precursor m/z of the query spectrum. Required for modified cosine similarity to account for precursor mass shifts between related compounds."
+      in: query
+      name: precursor_mz
+      schema:
+        $ref: "./FilterSchemas.yaml#/components/schemas/PrecursorMz"
       required: false

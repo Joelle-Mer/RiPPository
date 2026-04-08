@@ -56,7 +56,7 @@ function ServiceStatusView() {
             }}
           >
             <Result
-              title="MassBank API"
+              title="RiPPository API"
               subTitle={
                 <div>
                   <label style={{ color: 'black' }}>

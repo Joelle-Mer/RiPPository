@@ -1,3 +1,13 @@
 .ant-table-thead .ant-table-cell {
   text-align: center !important;
 }
+
+/* Allow filter menu items to expand to fit their content */
+.ant-menu-inline .ant-menu-item {
+  height: auto !important;
+  line-height: 1.5 !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+}

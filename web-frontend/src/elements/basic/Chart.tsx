@@ -220,32 +220,24 @@ function Chart({
     let labelValues: number[] = [];
     let precision: number | undefined;
 
+    // Maximum number of labels that fit without overlapping (~65px per label)
+    const maxLabels = Math.max(2, Math.floor(boundsWidth / 65));
+
     if (range === 0) {
       labelValues = [minX];
       precision = 4;
-    } else if (range > 200) {
-      const stepSize = 50;
-      labelValues = buildLabelValues(minX, maxX, stepSize);
-      precision = 0;
-    } else if (range >= 100) {
-      const stepSize = 20;
-      labelValues = buildLabelValues(minX, maxX, stepSize);
-      precision = 0;
-    } else if (range >= 50) {
-      const stepSize = 10;
-      labelValues = buildLabelValues(minX, maxX, stepSize);
-      precision = 0;
-    } else if (range >= 25) {
-      const stepSize = 5;
-      labelValues = buildLabelValues(minX, maxX, stepSize);
-      precision = 0;
-    } else if (range >= 10) {
-      const stepSize = 2;
-      labelValues = buildLabelValues(minX, maxX, stepSize);
-      precision = 0;
-    } else if (range >= 5) {
-      const stepSize = 1;
-      labelValues = buildLabelValues(minX, maxX, stepSize);
+    } else if (range > 1) {
+      // Candidate step sizes from coarse to fine
+      const candidates = [500, 200, 100, 50, 25, 20, 10, 5, 2, 1];
+      let chosen = candidates[0];
+      for (const step of candidates) {
+        const vals = buildLabelValues(minX, maxX, step);
+        if (vals.length <= maxLabels) {
+          chosen = step;
+          break;
+        }
+      }
+      labelValues = buildLabelValues(minX, maxX, chosen);
       precision = 0;
     } else if (range >= 1) {
       const stepSize = 0.5;
@@ -267,7 +259,7 @@ function Chart({
           }
           textAnchor="middle"
           alignmentBaseline="central"
-          fontSize={15}
+          fontSize={13}
         >
           {x.toFixed(precision)}
         </text>
@@ -282,7 +274,7 @@ function Chart({
         />
       </g>
     ));
-  }, [filteredPeakData2, xScale, yScale, yScale2]);
+  }, [boundsWidth, filteredPeakData2, xScale, yScale, yScale2]);
 
   const xAxis = useMemo(() => {
     return (
@@ -509,7 +501,7 @@ function Chart({
         frontendUrl +
         baseUrl +
         '/' +
-        routes.search.path +
+        routes.content.path +
         `?${searchParams.toString()}`;
 
       return url;

@@ -12,7 +12,7 @@ function buildSearchUrl(
     frontendUrl +
     baseUrl +
     '/' +
-    routes.search.path +
+    routes.content.path +
     `?${searchParams.toString()}`;
 
   return url;

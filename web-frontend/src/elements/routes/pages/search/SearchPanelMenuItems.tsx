@@ -1,4 +1,4 @@
-import { Form, FormItemProps, Input, InputNumber } from 'antd';
+import { Button, Form, FormItemProps, Input, InputNumber } from 'antd';
 import {
   BarChartOutlined,
   BarcodeOutlined,
@@ -22,6 +22,43 @@ import defaultTooltipText from '../../../../constants/defaultTooltipText';
 
 const peakListPattern: RegExp =
   /^(\d+(\.\d+){0,1} \d+(\.\d+){0,1}( \d+(\.\d+){0,1}){0,1})(\n\d+(\.\d+){0,1} \d+(\.\d+){0,1}( \d+(\.\d+){0,1}){0,1})*$/;
+
+function PeakListField({
+  insertPlaceholder,
+}: {
+  insertPlaceholder: (e: KeyboardEvent<HTMLElement>, values: SearchFields) => void;
+}) {
+  const form = Form.useFormInstance<SearchFields>();
+  return (
+    <div style={{ width: '100%' }}>
+      <Input.TextArea
+        placeholder={'147.063 11\n303.05 999\n449.108 64\n465.102 587\n611.161 669'}
+        autoSize={{ minRows: 5 }}
+        onKeyDown={(e: KeyboardEvent<HTMLTextAreaElement>) =>
+          insertPlaceholder(e, {
+            spectralSearchFilterOptions: {
+              similarity: {
+                peakList: '147.063 11\n303.05 999\n449.108 64\n465.102 587\n611.161 669',
+              },
+            },
+          })
+        }
+      />
+      <Button
+        size="small"
+        style={{ marginTop: 6 }}
+        onClick={() =>
+          form.setFieldValue(
+            ['spectralSearchFilterOptions', 'similarity', 'peakList'],
+            undefined,
+          )
+        }
+      >
+        Clear peak list
+      </Button>
+    </div>
+  );
+}
 
 type InputProps = {
   propertyFilterOptions?: ContentFilterOptions | null;
@@ -444,21 +481,7 @@ function SearchPanelMenuItems({
                 peakListPattern,
                 7,
                 17,
-                <Input.TextArea
-                  placeholder="147.063 11&#10;303.05 999&#10;449.108 64&#10;465.102 587&#10;611.161 669"
-                  autoSize={{ minRows: 5 }}
-                  allowClear
-                  onKeyDown={(e: KeyboardEvent<HTMLTextAreaElement>) =>
-                    insertPlaceholder(e, {
-                      spectralSearchFilterOptions: {
-                        similarity: {
-                          peakList:
-                            '147.063 11\n303.05 999\n449.108 64\n465.102 587\n611.161 669',
-                        },
-                      },
-                    })
-                  }
-                />,
+                <PeakListField insertPlaceholder={insertPlaceholder} />,
                 'Enter m/z and intensity values, delimited by a space, to be used during spectral similarity search.' +
                   ' ' +
                   defaultTooltipText,
@@ -498,6 +521,42 @@ function SearchPanelMenuItems({
                   style={{ width: '100%' }}
                 />,
                 'This parameter limits the number of results by setting this similarity score threshold value. It ranges from 0 to 1 (lowest to highest similarity).' +
+                  ' ' +
+                  defaultTooltipText,
+              ),
+            },
+            {
+              key: 'similarityPrecursorMz',
+              style: {
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginLeft: 0,
+              },
+              label: buildFormItemWithTootip(
+                'Precursor m/z',
+                ['spectralSearchFilterOptions', 'similarity', 'precursorMz'],
+                false,
+                undefined,
+                7,
+                17,
+                <InputNumber
+                  placeholder="e.g. 303.05"
+                  min={0}
+                  onKeyDown={(e: KeyboardEvent<HTMLInputElement>) =>
+                    insertPlaceholder(e, {
+                      spectralSearchFilterOptions: {
+                        similarity: {
+                          precursorMz: 303.05,
+                        },
+                      },
+                    })
+                  }
+                  style={{ width: '100%' }}
+                />,
+                'The precursor m/z of the query spectrum. Used by the modified cosine algorithm to match peaks shifted by the precursor mass difference between related compounds.' +
                   ' ' +
                   defaultTooltipText,
               ),

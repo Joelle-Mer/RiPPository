@@ -9,7 +9,7 @@ import { usePropertiesContext } from '../../../../context/properties/properties'
 import validateRecord from '../../../../utils/request/validateRecord';
 
 const rawTextPlaceholder =
-  'ACCESSION: MSBNK-IPB_Halle-PB001341\n\
+  'ACCESSION: RIPPOS-IPB_Halle-PB001341\n\
 RECORD_TITLE: Rutin; LC-ESI-QTOF; MS2; CE:10 eV; [M+H]+\n\
 DATE: 2016.01.19 (Created 2008.05.22, modified 2013.06.04)\n\
 AUTHORS: Boettcher C, Institute of Plant Biochemistry, Halle, Germany\n\
@@ -225,7 +225,7 @@ function Validation() {
     const items: CollapseProps['items'] = [
       {
         key: '1',
-        label: 'Input MassBank Record Text',
+        label: 'Input Record Text',
         showArrow: false,
         children: (
           <TextArea
@@ -293,7 +293,7 @@ function Validation() {
               alignItems: 'center',
             }}
           >
-            Upload or paste your MassBank record file to validate it.
+            Upload or paste your record file to validate it.
           </p>
           <Content
             style={{

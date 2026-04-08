@@ -1,109 +1,43 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Layout } from 'antd';
 import { Content } from 'antd/es/layout/layout';
-import { Layout, Spin } from 'antd';
-import Segmented from '../../../basic/Segmented';
-import SectionDivider from '../../../basic/SectionDivider';
-
-const templateUrlNews =
-  'https://massbank.github.io/MassBank-documentation/news.html';
-const templateUrlNewsArchive =
-  'https://massbank.github.io/MassBank-documentation/news_archive.html';
 
 function NewsView() {
-  const [htmlTemplateNews, setHtmlTemplateNews] = useState<string>('');
-  const [htmlTemplateNewsArchive, setHtmlTemplateNewsArchive] =
-    useState<string>('');
-  const [isFetching, setIsFetching] = useState<boolean>(false);
-
-  useEffect(() => {
-    async function fetchHtml() {
-      setIsFetching(true);
-
-      let response = await fetch(templateUrlNews);
-      let html = await response.text();
-      setHtmlTemplateNews(html);
-
-      response = await fetch(templateUrlNewsArchive);
-      html = await response.text();
-      setHtmlTemplateNewsArchive(html);
-
-      setIsFetching(false);
-    }
-
-    fetchHtml();
-  }, []);
-
-  const segmented = useMemo(() => {
-    const elements = [
+  return (
+    <Layout style={{ width: '100%', height: '100%' }}>
       <Content
-        style={{
-          width: '100%',
-          height: '100%',
-        }}
-      >
-        <SectionDivider label="Latest" />
-        <Content
-          style={{
-            padding: 10,
-            fontSize: 16,
-          }}
-          dangerouslySetInnerHTML={{ __html: htmlTemplateNews }}
-        />
-      </Content>,
-      <Content
-        style={{
-          width: '100%',
-          height: '100%',
-        }}
-      >
-        <SectionDivider label="Archive" />
-        <Content
-          style={{
-            padding: 10,
-            fontSize: 16,
-          }}
-          dangerouslySetInnerHTML={{ __html: htmlTemplateNewsArchive }}
-        />
-      </Content>,
-    ];
-    const elementLabels = ['Latest', 'Archive'];
-
-    return isFetching ? (
-      <Spin
-        size="large"
         style={{
           width: '100%',
           height: '100%',
           display: 'flex',
+          flexDirection: 'column',
           justifyContent: 'center',
           alignItems: 'center',
-        }}
-        spinning={isFetching}
-      />
-    ) : (
-      <Segmented elements={elements} elementLabels={elementLabels} />
-    );
-  }, [htmlTemplateNews, htmlTemplateNewsArchive, isFetching]);
-
-  return useMemo(
-    () => (
-      <Layout
-        style={{
-          width: '100%',
-          height: '100%',
+          padding: 60,
         }}
       >
-        <Content
+        <div
           style={{
-            width: '100%',
-            height: '100%',
+            width: 60,
+            height: 60,
+            borderRadius: '50%',
+            backgroundColor: '#e8f0fe',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            fontSize: 28,
+            marginBottom: 20,
           }}
         >
-          {segmented}
-        </Content>
-      </Layout>
-    ),
-    [segmented],
+          📰
+        </div>
+        <h2 style={{ color: '#0f2d52', fontWeight: 600, marginBottom: 8 }}>
+          News Coming Soon
+        </h2>
+        <p style={{ color: '#64748b', textAlign: 'center', maxWidth: 400 }}>
+          Updates and announcements about RiPPository will be posted here.
+        </p>
+      </Content>
+    </Layout>
   );
 }
 

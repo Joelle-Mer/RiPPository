@@ -47,7 +47,7 @@ function InformationTable({ record, width, height }: InputProps) {
     const dataSource: InformationTableType[] = [];
     dataSource.push({
       key: 'record-view-general-table-authors',
-      label: 'Authors',
+      label: 'Submitter',
       value: (
         <ExportableContent
           component={
@@ -58,11 +58,11 @@ function InformationTable({ record, width, height }: InputProps) {
           mode="copy"
           onClick={() =>
             handleOnCopy(
-              'Authors',
+              'Submitter',
               record.authors.map((a) => a.name).join(', '),
             )
           }
-          title="Copy authors to clipboard"
+          title="Copy submitter to clipboard"
         />
       ),
     });

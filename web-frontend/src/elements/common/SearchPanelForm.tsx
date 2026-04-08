@@ -11,6 +11,7 @@ type InputProps = {
   items: ItemType<MenuItemType>[];
   initialValues: SearchFields;
   onSubmit: (data: SearchFields) => void;
+  onValuesChange?: (allValues: SearchFields) => void;
   collapsed: boolean;
   collapseButtonWidth: number;
   width?: CSSProperties['width'];
@@ -18,6 +19,7 @@ type InputProps = {
   defaultOpenKeys?: string[];
   defaultSelectedKeys?: string[];
   style?: CSSProperties;
+  hideSearchButton?: boolean;
 };
 
 function SearchPanelForm({
@@ -25,6 +27,7 @@ function SearchPanelForm({
   items,
   initialValues,
   onSubmit,
+  onValuesChange,
   collapsed,
   collapseButtonWidth,
   width = '100%',
@@ -32,6 +35,7 @@ function SearchPanelForm({
   defaultOpenKeys = [],
   defaultSelectedKeys = [],
   style = {},
+  hideSearchButton = false,
 }: InputProps) {
   return useMemo(
     () => (
@@ -56,25 +60,18 @@ function SearchPanelForm({
           }}
           initialValues={initialValues}
           onFinish={onSubmit}
+          onValuesChange={onValuesChange ? (_, all) => onValuesChange(all as SearchFields) : undefined}
         >
           <Content
             style={{
               width: '100%',
-              height:
-                typeof height === 'number'
-                  ? height - submitButtonHeight
-                  : `calc(${height} - ${submitButtonHeight}px)`,
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'center',
+              flex: 1,
+              overflowY: 'auto',
             }}
           >
             <Menu
               style={{
                 width: '100%',
-                height: '100%',
-                overflow: 'scroll',
                 border: 'none',
                 backgroundColor: 'transparent',
               }}
@@ -84,6 +81,8 @@ function SearchPanelForm({
               defaultOpenKeys={defaultOpenKeys}
               defaultSelectedKeys={defaultSelectedKeys}
             />
+          </Content>
+          {!hideSearchButton && (
             <Button
               htmlType="submit"
               style={{
@@ -91,12 +90,13 @@ function SearchPanelForm({
                 height: submitButtonHeight - 10,
                 marginTop: 5,
                 marginBottom: 5,
+                flexShrink: 0,
                 backgroundColor: 'rgb(167, 199, 254)',
               }}
             >
               Search
             </Button>
-          </Content>
+          )}
         </Form>
       </Form.Provider>
     ),
@@ -110,8 +110,10 @@ function SearchPanelForm({
       initialValues,
       items,
       onSubmit,
+      onValuesChange,
       style,
       width,
+      hideSearchButton,
     ],
   );
 }

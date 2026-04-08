@@ -1,5 +1,24 @@
+/* Remove bottom border on menu items */
 .ant-menu-horizontal > .ant-menu-item::after,
 .ant-menu-horizontal > .ant-menu-submenu::after {
   border-bottom: none !important;
   transition: none !important;
+}
+
+/* Menu hover state */
+.ant-menu-horizontal .ant-menu-item:hover {
+  background-color: #f1f5f9 !important;
+  border-radius: 8px !important;
+}
+
+/* Remove default selection highlight */
+.ant-menu-item-active,
+.ant-menu-item-selected {
+  background-color: transparent !important;
+}
+
+/* Add subtle bottom border to header */
+.ant-layout-header {
+  border-bottom: 1px solid #e5e7eb !important;
+  box-shadow: 0 1px 8px rgba(0,0,0,0.06) !important;
 }

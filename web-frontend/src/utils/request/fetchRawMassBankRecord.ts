@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-async function fetchRawMassBankRecord(
+async function fetchRawRecord(
   exportServiceUrl: string,
   accession: string,
 ) {
@@ -21,4 +21,4 @@ async function fetchRawMassBankRecord(
   return null;
 }
 
-export default fetchRawMassBankRecord;
+export default fetchRawRecord;

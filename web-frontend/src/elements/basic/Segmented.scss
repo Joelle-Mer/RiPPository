@@ -1,21 +1,38 @@
-$color: rgb(223, 223, 223); //#f3ece0
-$highlight-color: lightblue;
-
+/* Sidebar tab container */
 .ant-segmented {
-  border: 1px solid lightgrey !important;
+  background-color: #f8fafc !important;
+  border: none !important;
+  border-right: 1px solid #e5e7eb !important;
   border-radius: 0 !important;
-
-  background-color: $color !important;
+  padding: 12px 0 !important;
 }
 
+/* Individual tab items */
 .ant-segmented-item {
-  transition: $highlight-color 0.3s cubic-bezier(0.645, 0.045, 0.355, 1) !important;
+  border-radius: 0 !important;
+  font-size: 13.5px !important;
+  font-weight: 500 !important;
+  color: #6b7280 !important;
+  padding: 10px 18px !important;
+  transition: all 0.2s !important;
+  text-align: left !important;
 }
 
+.ant-segmented-item:hover {
+  color: #2563eb !important;
+  background-color: #eff6ff !important;
+}
+
+/* Active tab */
 .ant-segmented-item-selected {
-  background-color: $highlight-color !important;
+  background-color: #eff6ff !important;
+  color: #2563eb !important;
+  font-weight: 600 !important;
+  border-left: 3px solid #2563eb !important;
+  box-shadow: none !important;
 }
 
 .ant-segmented-thumb {
-  background-color: $highlight-color !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
 }

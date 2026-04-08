@@ -1,5 +1,5 @@
 import { Content } from 'antd/es/layout/layout';
-import { JSX, useCallback, useEffect, useMemo, useState } from 'react';
+import { JSX, ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import ResultTableSortOptionType from '../../types/ResultTableSortOptionType';
 import resultTableSortOptionValues from '../../constants/resultTableSortOptionValues';
 import ResultPanel from '../result/ResultPanel';
@@ -19,6 +19,8 @@ type InputProps = {
   hits: Hit[] | null;
   isRequesting: boolean;
   reference?: Peak[];
+  searchBar?: ReactNode;
+  searchBarHeight?: number;
   onSort: (sortValue: ResultTableSortOption) => void;
   onResize: (searchPanelWidth: number) => void;
 };
@@ -33,6 +35,8 @@ function SearchAndResultPanel({
   hits,
   isRequesting,
   reference = [],
+  searchBar,
+  searchBarHeight = 0,
   onSort,
   onResize,
 }: InputProps) {
@@ -96,9 +100,10 @@ function SearchAndResultPanel({
           justifyContent: 'center',
           alignItems: 'center',
           userSelect: 'none',
+          overflowX: 'hidden',
         }}
       >
-        <Splitter style={{ width, height }} onResize={handleOnResize}>
+        <Splitter style={{ width, height, overflow: 'hidden' }} onResize={handleOnResize}>
           <Splitter.Panel
             size={panelWidths.searchPanel}
             min={200 + collapseButtonWidth}

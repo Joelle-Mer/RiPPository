@@ -48,5 +48,5 @@ type DefaultAPIServicer interface {
 	GetMetadata(context.Context) (ImplResponse, error)
 	GetVersion(context.Context) (ImplResponse, error)
 	GetStatus(context.Context) (ImplResponse, error)
-	GetSimilarity(context.Context, []string, float64, []string) (ImplResponse, error)
+	GetSimilarity(context.Context, []string, float64, []string, float64) (ImplResponse, error)
 }

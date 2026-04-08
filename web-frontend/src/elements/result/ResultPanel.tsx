@@ -7,7 +7,7 @@ import Peak from '../../types/peak/Peak';
 import Record from '../../types/record/Record';
 import Placeholder from '../basic/Placeholder';
 import fetchData from '../../utils/request/fetchData';
-import { Button, Dropdown, Modal, Pagination, Select, Spin } from 'antd';
+import { Button, Dropdown, Modal, Pagination, Spin } from 'antd';
 import { Content } from 'antd/es/layout/layout';
 import SpectralHitsCarouselView from '../routes/pages/search/SpectralHitsCarouselView';
 import ResultTableSortOptionType from '../../types/ResultTableSortOptionType';
@@ -20,6 +20,8 @@ import downloadRecords from '../../utils/request/downloadRecords';
 import DownloadMenuItems from '../common/DownloadMenuItems';
 import RequestResponse from '../../types/RequestResponse';
 import ErrorElement from '../basic/ErrorElement';
+import FileSaver from 'file-saver';
+const { saveAs } = FileSaver;
 
 type InputProps = {
   reference?: Peak[];
@@ -51,9 +53,6 @@ function ResultPanel({
   const [showModal, setShowModal] = useState<boolean>(false);
   const [slideIndex, setSlideIndex] = useState<number>(0);
   const [resultPageIndex, setResultPageIndex] = useState<number>(0);
-  const [selectedSortOption, setSelectedSortOption] = useState<
-    ResultTableSortOption | undefined
-  >();
   const [hitsWithRecords, setHitsWithRecords] = useState<Hit[] | null>(null);
 
   const pageLimit = 20;
@@ -99,18 +98,21 @@ function ResultPanel({
       }
 
       const range = to - from;
-      const accessions = _hits
-        .slice(from, from + range)
-        .map((h) => h.accession);
-
+      const hitsSlice = _hits.slice(from, from + range);
       const records: (Record | null)[] = [];
-      for (const accession of accessions) {
-        const url = backendUrl + '/records/' + accession + '/simple';
+      for (const hit of hitsSlice) {
+        // Local submissions (e.g. approved from localStorage) already have record data — skip backend fetch
+        if (hit.record) {
+          records.push(hit.record as Record);
+          continue;
+        }
+
+        const url = backendUrl + '/records/' + hit.accession + '/simple';
 
         const response = (await fetchData(url)) as RequestResponse<Record>;
         if (response.status === 'error') {
           setErrorMessage(
-            `Error fetching record for accession ${accession}: ${response.message}`,
+            `Error fetching record for accession ${hit.accession}: ${response.message}`,
           );
           records.push(null);
           break;
@@ -133,7 +135,7 @@ function ResultPanel({
         }
       }
 
-      _hitsWithRecords = _hits.slice(from, from + range).map((h, i) => {
+      _hitsWithRecords = hitsSlice.map((h, i) => {
         h.record = records[i];
         return h;
       });
@@ -213,24 +215,23 @@ function ResultPanel({
     [hits],
   );
 
-  const handleOnSelect = useCallback(
-    (value: ResultTableSortOption) => {
-      setSelectedSortOption(value);
-      onSort(value);
-    },
-    [onSort],
-  );
-
   const handleOnDownloadResult = useCallback(
     async (format: DownloadFormat) => {
       setIsRequestingDownload(true);
 
       if (hits) {
-        await downloadRecords(
-          exportServiceUrl,
-          format,
-          hits.map((h) => h.accession),
-        );
+        const allLocal = hits.every((h) => h.record != null);
+        if (allLocal) {
+          const data = JSON.stringify(hits.map((h) => h.record), null, 2);
+          const blob = new Blob([data], { type: 'application/json' });
+          saveAs(blob, 'rippository_records.json');
+        } else {
+          await downloadRecords(
+            exportServiceUrl,
+            format,
+            hits.map((h) => h.accession),
+          );
+        }
       }
 
       setIsRequestingDownload(false);
@@ -288,21 +289,6 @@ function ResultPanel({
             textWrap: 'nowrap',
           }}
         />
-        {sortOptions.length > 0 && (
-          <Select
-            defaultValue={selectedSortOption}
-            style={{ width: 200 }}
-            placeholder={<label style={{ color: 'black' }}>Sort by</label>}
-            optionFilterProp="label"
-            filterSort={(optionA, optionB) =>
-              (optionA?.label ?? '')
-                .toLowerCase()
-                .localeCompare((optionB?.label ?? '').toLowerCase())
-            }
-            options={sortOptions}
-            onSelect={handleOnSelect}
-          />
-        )}
         <Dropdown menu={{ items: downloadMenuItems }} trigger={['click']}>
           <Button
             style={{
@@ -337,9 +323,6 @@ function ResultPanel({
       hits,
       handleOnSelectPage,
       resultPageIndex,
-      sortOptions,
-      selectedSortOption,
-      handleOnSelect,
       downloadMenuItems,
     ],
   );
@@ -383,7 +366,8 @@ function ResultPanel({
               style={{
                 width: '100%',
                 height,
-                overflow: 'scroll',
+                overflowY: 'auto',
+                overflowX: 'hidden',
               }}
             >
               {paginationContainer}

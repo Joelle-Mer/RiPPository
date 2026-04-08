@@ -13,6 +13,10 @@ import SectionDivider from '../basic/SectionDivider';
 import Segmented from '../basic/Segmented';
 import segmentedWidth from '../../constants/segmentedWidth';
 import MassSpectrometryTable from './MassSpectrometryTable';
+import { BgcSectionFromMibig } from '../basic/BgcViewer';
+import { Descriptions, Table, Typography } from 'antd';
+
+const { Text } = Typography;
 
 type inputProps = {
   record: Record;
@@ -21,8 +25,7 @@ type inputProps = {
 };
 
 function RecordView({ record, width, height }: inputProps) {
-  const imageWidth = 500;
-  const headerHeight = 400;
+  const imageWidth = 260;
   const minChartWidth = useMemo(() => width / 2, [width]);
   const minPeakTableWith = 400;
   const chartAndPeakTableHeight = 600;
@@ -41,7 +44,22 @@ function RecordView({ record, width, height }: inputProps) {
 
     const hasLinks = record.compound.link && record.compound.link.length > 0;
     const hasSpecies = record.species && Object.keys(record.species).length > 0;
-    const hasComments = record.comments && record.comments.length > 0;
+
+    // Split comments by subtag
+    const bioactivityComments = (record.comments ?? []).filter(
+      c => c.subtag?.toUpperCase() === 'BIOACTIVITY',
+    );
+    const noteComments = (record.comments ?? []).filter(
+      c => c.subtag?.toUpperCase() === 'NOTE',
+    );
+    const mibigComment = (record.comments ?? []).find(
+      c => c.subtag?.toUpperCase() === 'MIBIG',
+    );
+    const otherComments = (record.comments ?? []).filter(
+      c => !['BIOACTIVITY', 'NOTE', 'MIBIG'].includes(c.subtag?.toUpperCase() ?? ''),
+    );
+
+    const hasComments = otherComments.length > 0;
 
     const elements: JSX.Element[] = [];
     const elementLabels: string[] = [];
@@ -50,7 +68,6 @@ function RecordView({ record, width, height }: inputProps) {
       <RecordViewHeader
         record={record}
         width="100%"
-        height={headerHeight}
         imageWidth={imageWidth}
       />
     );
@@ -130,12 +147,66 @@ function RecordView({ record, width, height }: inputProps) {
     if (hasSpecies) {
       const species = (
         <Content>
-          {buildDivider('Species')}
+          {buildDivider('Source')}
           <SpeciesTable species={record.species} width="100%" height="auto" />
         </Content>
       );
       elements.push(species);
-      elementLabels.push('Species');
+      elementLabels.push('Source');
+    }
+
+    if (noteComments.length > 0) {
+      const noteSection = (
+        <Content>
+          {buildDivider('Note')}
+          <div style={{ padding: '12px 16px', background: '#fafafa', borderRadius: 6, border: '1px solid #e5e7eb', margin: '0 0 8px' }}>
+            {noteComments.map((c, i) => (
+              <Text key={i} style={{ display: 'block', color: '#374151' }}>{c.value}</Text>
+            ))}
+          </div>
+        </Content>
+      );
+      elements.push(noteSection);
+      elementLabels.push('Note');
+    }
+
+    if (bioactivityComments.length > 0) {
+      const bioSection = (
+        <Content>
+          {buildDivider('Bioactivity')}
+          <Table
+            size="small"
+            pagination={false}
+            dataSource={bioactivityComments.map((c, i) => {
+              const parts = c.value.split(/\s*\(|\)\s*/);
+              return {
+                key: i,
+                activity: parts[0]?.trim() ?? c.value,
+                details: parts[1]?.trim() ?? '',
+              };
+            })}
+            columns={[
+              { title: 'Activity', dataIndex: 'activity', ellipsis: true },
+              { title: 'Details', dataIndex: 'details', ellipsis: true,
+                render: (v: string) => v || <Text type="secondary">N/A</Text> },
+            ]}
+            style={{ width: '100%' }}
+          />
+        </Content>
+      );
+      elements.push(bioSection);
+      elementLabels.push('Bioactivity');
+    }
+
+    if (mibigComment) {
+      const bgcSection = (
+        <Content>
+          {buildDivider('Genome / BGC')}
+          <BgcSectionFromMibig mibig={mibigComment.value} />
+        </Content>
+      );
+      elements.push(bgcSection);
+      elementLabels.push('Genome / BGC');
     }
 
     if (hasComments) {
@@ -143,7 +214,7 @@ function RecordView({ record, width, height }: inputProps) {
         <Content>
           {buildDivider('Comments')}
           <CommentsTable
-            comments={record.comments}
+            comments={otherComments}
             width="100%"
             height="auto"
           />

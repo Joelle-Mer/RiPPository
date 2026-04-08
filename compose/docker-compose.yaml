@@ -70,13 +70,12 @@ services:
       MB3_API_BASE_URL: ${MB3_API_BASE_URL}
 
   similarity-service:
-    platform: linux/amd64
-    image: quay.io/massbank/massbank-similarity-api:latest
-    pull_policy: always
+    build:
+      context: ../similarity-service
+      dockerfile: Dockerfile
     restart: unless-stopped
     environment:
       DATA_DIR: "/MassBank-data"
-      VERBOSE: false
       CONTEXT_PATH: ${SIMILARITY_SERVICE_BASE_URL}
     volumes:
       - "${MB_DATA_DIRECTORY}:/MassBank-data:ro"

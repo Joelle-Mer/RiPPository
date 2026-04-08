@@ -29,10 +29,10 @@ function DownloadMenuItems({ onDownload }: InputProps) {
       ),
     },
     {
-      key: '2_massbank_download',
+      key: '2_rippository_download',
       label: (
         <DownloadOptionLabel
-          label="MassBank"
+          label="RiPPository"
           format="massbank"
           onDownload={onDownload}
         />

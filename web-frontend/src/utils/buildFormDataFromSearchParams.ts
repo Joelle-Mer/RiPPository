@@ -38,9 +38,11 @@ function buildFormDataFromSearchParams(searchParams: URLSearchParams) {
         : defaultSearchFieldValues.spectralSearchFilterOptions!.similarity!
             .threshold;
     if (formData.spectralSearchFilterOptions) {
+      const precursor_mz = searchParams.get('precursor_mz');
       formData.spectralSearchFilterOptions.similarity = {
         peakList: peak_list_text,
         threshold: peak_list_threshold,
+        precursorMz: precursor_mz ? Number(precursor_mz) : undefined,
       };
     }
     containsValues = true;

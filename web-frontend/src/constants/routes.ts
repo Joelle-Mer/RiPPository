@@ -4,10 +4,11 @@ import AccessionView from '../elements/routes/pages/accession/AccessionView';
 import ContentView from '../elements/routes/pages/content/ContentView';
 import HomeView from '../elements/routes/pages/home/HomeView';
 import NotFoundView from '../elements/routes/pages/notfound/NotFoundView';
-import SearchView from '../elements/routes/pages/search/SearchView';
 import ServiceView from '../elements/routes/pages/service/ServiceView';
 import NewsView from '../elements/routes/pages/more/NewsView';
 import DocumentationView from '../elements/routes/pages/more/DocumentationView';
+import MoreView from '../elements/routes/pages/more/MoreView';
+import SubmitLandingView from '../elements/routes/pages/submit/SubmitLandingView';
 
 const routes: Record<string, RouteType> = {
   home: {
@@ -16,17 +17,23 @@ const routes: Record<string, RouteType> = {
     id: 'home',
     path: '/',
   },
-  search: {
-    component: SearchView,
-    label: 'Search',
-    id: 'search',
-    path: 'search',
-  },
   content: {
     component: ContentView,
     label: 'Content',
     id: 'content',
     path: 'content',
+  },
+  submit: {
+    component: SubmitLandingView,
+    label: 'Submit',
+    id: 'submit',
+    path: 'submit',
+  },
+  more: {
+    component: MoreView,
+    label: 'More',
+    id: 'more',
+    path: 'more',
   },
   service: {
     component: ServiceView,

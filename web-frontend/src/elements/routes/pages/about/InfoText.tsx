@@ -1,197 +1,99 @@
 import { Content } from 'antd/es/layout/layout';
-import Paragraph from 'antd/es/typography/Paragraph';
 import { memo } from 'react';
-
-import massbankLogo from '../../../../assets/rippository_logo.png';
+import rippositoryLogo from '../../../../assets/rippository_logo.png';
 
 function InfoText() {
   return (
     <Content
       style={{
-        padding: 10,
+        padding: '40px 60px',
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'center',
         alignItems: 'center',
+        maxWidth: 860,
+        margin: '0 auto',
       }}
     >
       <img
-        src={massbankLogo}
-        style={{ width: 500, marginTop: 10, marginBottom: 10 }}
-        key={'massbank-logo-overview'}
-        alt="MassBank logo"
+        src={rippositoryLogo}
+        style={{ width: 300, marginBottom: 32 }}
+        alt="RiPPository logo"
       />
-      <Content style={{ padding: 10 }}>
-        <Paragraph>
-          MassBank is an open source mass spectral library for the
-          identification of small chemical molecules of metabolomics, exposomics
-          and environmental relevance. The vast majority of MassBank contents
-          now features high-resolution mass spectrometry data, although all
-          kinds of mass spectral data are accepted. A range of search options
-          are available for browsing the data. The MassBank library is based on
-          text file records containing the record metadata and the mass spectral
-          information in the{' '}
-          {
-            <a
-              href="https://github.com/MassBank/MassBank-web/blob/main/Documentation/MassBankRecordFormat.md"
-              target="_blank"
-              style={{ color: 'black', textDecoration: 'underline' }}
-            >
-              MassBank record format
-            </a>
-          }
-          . All data is archived on{' '}
-          {
-            <a
-              href="https://github.com/MassBank/MassBank-data"
-              target="_blank"
-              style={{ color: 'black', textDecoration: 'underline' }}
-            >
-              GitHub
-            </a>
-          }{' '}
-          and{' '}
-          {
-            <a
-              href="https://zenodo.org/records/14221628"
-              target="_blank"
-              style={{ color: 'black', textDecoration: 'underline' }}
-            >
-              {' '}
-              Zenodo
-            </a>
-          }
-          ; the code is also on{' '}
-          {
-            <a
-              href="https://github.com/MassBank/MassBank3"
-              target="_blank"
-              style={{ color: 'black', textDecoration: 'underline' }}
-            >
-              GitHub
-            </a>
-          }
-          . The MassBank library can be downloaded in different{' '}
-          {
-            <a
-              href="https://github.com/MassBank/MassBank-data/releases"
-              target="_blank"
-              style={{ color: 'black', textDecoration: 'underline' }}
-            >
-              file formats
-            </a>
-          }{' '}
-          such as text records, database files (sql) and MSP files.
-        </Paragraph>
-        <Paragraph>
-          MassBank is maintained and developed by the{' '}
-          {
-            <a
-              href="https://github.com/MassBank"
-              target="_blank"
-              style={{ color: 'black', textDecoration: 'underline' }}
-            >
-              MassBank consortium
-            </a>
-          }{' '}
-          and is supported by the{' '}
-          {
-            <a
-              href="https://www.norman-network.net/"
-              target="_blank"
-              style={{ color: 'black', textDecoration: 'underline' }}
-            >
-              NORMAN Association
-            </a>
-          }
-          ,{' '}
-          {
-            <a
-              href="https://www.fnr.lu/"
-              target="_blank"
-              style={{ color: 'black', textDecoration: 'underline' }}
-            >
-              FNR
-            </a>
-          }{' '}
-          and{' '}
-          {
-            <a
-              href="https://www.nfdi4chem.de/"
-              target="_blank"
-              style={{ color: 'black', textDecoration: 'underline' }}
-            >
-              NFDI4Chem
-            </a>
-          }
-          . The main sustainers and developers of MassBank and related tools are
-          the team of Steffen Neumann (
-          {
-            <a
-              href="https://www.ipb-halle.de/en/research/program-center-metacom/research-groups/computational-plant-biochemistry"
-              target="_blank"
-              style={{ color: 'black', textDecoration: 'underline' }}
-            >
-              Leibniz Institute of Plant Biochemistry, Halle/Saale, Germany
-            </a>
-          }
-          ), Emma Schymanski (
+      <div style={{ width: '100%', lineHeight: 1.8, color: '#2d3748', fontSize: 15 }}>
+        <p>
+          RiPPository is an open-source spectral library dedicated to the identification
+          of ribosomally synthesized and post-translationally modified peptides (RiPPs).
+          It provides a curated collection of high-resolution mass spectrometry data for
+          RiPP natural products, enabling systematic dereplication and discovery of novel
+          bioactive peptides.
+        </p>
+        <p>
+          RiPPository is developed and maintained at Leiden University and Wageningen University &amp; Research
+          as a resource for the natural products and metabolomics communities.
+        </p>
+
+        <h3 style={{ marginTop: 32, marginBottom: 8, color: '#1a2e44' }}>Origin &amp; Technology</h3>
+        <p>
+          RiPPository is built on the{' '}
+          <a href="https://massbank.eu" target="_blank" rel="noopener noreferrer">
+            MassBank
+          </a>{' '}
+          platform, a public, open-access repository for sharing high-resolution mass
+          spectral data developed by the MassBank consortium. The underlying web
+          infrastructure, record format, and search functionality of RiPPository are
+          derived from the{' '}
+          <a href="https://github.com/MassBank/MassBank-web" target="_blank" rel="noopener noreferrer">
+            MassBank-web
+          </a>{' '}
+          open-source project, which is licensed under the GNU General Public License v2.
+        </p>
+
+        <h3 style={{ marginTop: 32, marginBottom: 8, color: '#1a2e44' }}>Please Cite</h3>
+        <p style={{ marginBottom: 8 }}>
+          If you use RiPPository in your research, please cite:
+        </p>
+        <div
+          style={{
+            background: '#f7fafc',
+            border: '1px solid #e2e8f0',
+            borderRadius: 6,
+            padding: '14px 18px',
+            fontSize: 14,
+            lineHeight: 1.7,
+          }}
+        >
+          RiPPository: an open-access spectral library for ribosomally synthesized
+          and post-translationally modified peptides (RiPPs). Leiden University &amp; Wageningen University &amp; Research.{' '}
           <a
-            href="https://www.uni.lu/lcsb-en/people/emma-schymanski/"
+            href="https://github.com/Joelle-Mer/RiPPository"
             target="_blank"
-            style={{ color: 'black', textDecoration: 'underline' }}
+            rel="noopener noreferrer"
           >
-            Luxembourg Centre for Systems Biomedicine, University of Luxembourg,
-            LCSB, Belvaux, Luxembourg
+            https://github.com/Joelle-Mer/RiPPository
           </a>
-          ) and the{' '}
-          {
-            <a
-              href="https://www.ufz.de/"
-              target="_blank"
-              style={{ color: 'black', textDecoration: 'underline' }}
-            >
-              Helmholtz Centre for Environmental Research, Leipzig, Germany
-            </a>
-          }
-          .
-        </Paragraph>
-        <Paragraph>
-          Furthermore, MassBank is a service for{' '}
-          {
-            <a
-              href="https://elixir-europe.org/about-us/who-we-are/nodes/germany"
-              target="_blank"
-              style={{ color: 'black', textDecoration: 'underline' }}
-            >
-              ELIXIR-DE
-            </a>
-          }
-          .
-        </Paragraph>
-        <Paragraph>
-          Technical issues and ideas can be reported via{' '}
-          {
-            <a
-              href="https://github.com/MassBank/MassBank3"
-              target="_blank"
-              style={{ color: 'black', textDecoration: 'underline' }}
-            >
-              GitHub
-            </a>
-          }
-          . In case of general questions contact us via{' '}
-          {
-            <a
-              href="mailto:massbank@massbank.eu"
-              style={{ color: 'black', textDecoration: 'underline' }}
-            >
-              massbank@massbank.eu
-            </a>
-          }
-          .
-        </Paragraph>
-      </Content>
+        </div>
+
+        <h3 style={{ marginTop: 32, marginBottom: 8, color: '#1a2e44' }}>License</h3>
+        <p>
+          Spectral records in RiPPository are released under the{' '}
+          <a
+            href="https://creativecommons.org/licenses/by-sa/4.0/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)
+          </a>{' '}
+          licence unless otherwise stated. The source code is available on{' '}
+          <a
+            href="https://github.com/Joelle-Mer/RiPPository"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            GitHub
+          </a>{' '}
+          under the GNU General Public License v2.
+        </p>
+      </div>
     </Content>
   );
 }

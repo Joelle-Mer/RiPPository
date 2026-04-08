@@ -1,15 +1,12 @@
-import { MouseEvent, useCallback, useMemo, useState } from 'react';
-import { Button, Checkbox, Form } from 'antd';
+import { useCallback, useMemo } from 'react';
+import { Checkbox, Form } from 'antd';
 import { Content } from 'antd/es/layout/layout';
-import useFormInstance from 'antd/es/form/hooks/useFormInstance';
 import ValueCount from '../../types/ValueCount';
-import SearchFields from '../../types/filterOptions/SearchFields';
 
 type InputProps = {
   filterOptions: ValueCount[];
   filterName: string;
   label: string;
-  maxHeight?: number;
   showCounts?: boolean;
 };
 
@@ -17,13 +14,8 @@ function FilterTable({
   filterOptions,
   filterName,
   label,
-  maxHeight = 250,
   showCounts = false,
 }: InputProps) {
-  const formInstance = useFormInstance<SearchFields>();
-  const { setFieldValue } = formInstance;
-  const [allSelected, setAllSelected] = useState<boolean>(true);
-
   const createOptions = useCallback(
     (_filterOptions: ValueCount[]) => {
       return _filterOptions.map((vc) => {
@@ -49,71 +41,27 @@ function FilterTable({
     [createOptions, filterOptions],
   );
 
-  const handleOnSelectAll = useCallback(() => {
-    setFieldValue(
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
-      [filterName, label],
-      allSelected ? [] : options.map((vc) => vc.value),
-    );
-    setAllSelected(!allSelected);
-  }, [allSelected, filterName, label, options, setFieldValue]);
-
   return useMemo(
     () => (
-      <Content
-        style={{
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          textAlign: 'center',
-        }}
+      <Form.Item
+        name={[filterName, label]}
+        rules={[{ required: false }]}
+        style={{ width: '100%', marginBottom: 0 }}
+        initialValue={options.filter((vc) => vc.checked).map((vc) => vc.value)}
       >
-        <Content
+        <Checkbox.Group
+          options={options}
           style={{
             width: '100%',
-            maxHeight,
-            overflow: 'scroll',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 4,
+            padding: '4px 0',
           }}
-        >
-          <Form.Item
-            name={[filterName, label]}
-            rules={[{ required: false }]}
-            style={{
-              width: '100%',
-              height: '100%',
-            }}
-            initialValue={options
-              .filter((vc) => vc.checked)
-              .map((vc) => vc.value)}
-          >
-            <Checkbox.Group
-              options={options}
-              style={{
-                width: '100%',
-                height: '100%',
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-              }}
-            />
-          </Form.Item>
-        </Content>
-        <Button
-          children={allSelected ? 'Unselect' : 'Select'}
-          onClick={(e: MouseEvent<HTMLButtonElement>) => {
-            e.preventDefault();
-            e.stopPropagation();
-
-            handleOnSelectAll();
-          }}
-          style={{ marginTop: 5, marginBottom: 5, height: 25 }}
         />
-      </Content>
+      </Form.Item>
     ),
-    [allSelected, filterName, handleOnSelectAll, label, maxHeight, options],
+    [filterName, label, options],
   );
 }
 

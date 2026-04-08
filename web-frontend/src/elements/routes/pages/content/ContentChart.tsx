@@ -16,9 +16,10 @@ type InputProps = {
   identifier: string;
   width: number;
   height: number;
+  overrideTitle?: string;
 };
 
-function ContentChart({ content, identifier, width, height }: InputProps) {
+function ContentChart({ content, identifier, width, height, overrideTitle }: InputProps) {
   const topN = 10;
 
   const chart = useMemo(() => {
@@ -82,9 +83,10 @@ function ContentChart({ content, identifier, width, height }: InputProps) {
           data={data}
           layout={{
             title: {
-              text:
-                (itemCount > topN ? 'Top ' + topN + ' of ' : '') +
-                splitStringAndCapitaliseFirstLetter(identifier, '_', ' '),
+              text: overrideTitle
+                ? (itemCount > topN ? 'Top ' + topN + ' - ' : '') + overrideTitle
+                : (itemCount > topN ? 'Top ' + topN + ' of ' : '') +
+                  splitStringAndCapitaliseFirstLetter(identifier, '_', ' '),
             },
             width,
             height,
@@ -93,7 +95,7 @@ function ContentChart({ content, identifier, width, height }: InputProps) {
         />
       </Content>
     );
-  }, [content, height, identifier, width]);
+  }, [content, height, identifier, overrideTitle, width]);
 
   return useMemo(
     () => (

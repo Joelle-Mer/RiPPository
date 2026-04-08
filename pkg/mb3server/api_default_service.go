@@ -103,8 +103,8 @@ func (s *DefaultAPIService) GetStatus(ctx context.Context) (ImplResponse, error)
 }
 
 // GetSimilarity implements DefaultAPIServicer.
-func (s *DefaultAPIService) GetSimilarity(ctx context.Context, peakList []string, threshold float64, referenceSpectraList []string) (ImplResponse, error) {
-	result, err := GetSimilarity(peakList, threshold, referenceSpectraList)
+func (s *DefaultAPIService) GetSimilarity(ctx context.Context, peakList []string, threshold float64, referenceSpectraList []string, precursorMz float64) (ImplResponse, error) {
+	result, err := GetSimilarity(peakList, threshold, referenceSpectraList, precursorMz)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			return Response(http.StatusInternalServerError, nil), err

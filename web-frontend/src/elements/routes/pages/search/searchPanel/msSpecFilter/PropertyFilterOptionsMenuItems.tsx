@@ -14,24 +14,25 @@ function PropertyFilterOptionsMenuItems({
 }: InputProps) {
   return [
     {
-      key: 'propertyFilterOptions.contributor',
-      label: 'Contributor',
+      key: 'propertyFilterOptions.ripp_type',
+      label: 'Type of RiPP',
       children: [
         {
-          key: 'contributor',
-          style: {
-            width: '100%',
-            height: '100%',
-            marginLeft: 0,
-            overflow: 'scroll',
-          },
+          key: 'rippType',
+          style: { width: '100%', marginLeft: 0 },
           label: (
-            <FilterTable
-              filterOptions={propertyFilterOptions?.contributor ?? []}
-              filterName="propertyFilterOptions"
-              label="contributor"
-              showCounts={showCounts}
-            />
+            <Form.Item<SearchFields>
+              name={['propertyFilterOptions', 'ripp_type']}
+              rules={[{ required: false }]}
+              style={{ width: '100%', marginBottom: 0 }}
+            >
+              <FilterTable
+                filterOptions={propertyFilterOptions?.ripp_type ?? []}
+                filterName="propertyFilterOptions"
+                label="ripp_type"
+                showCounts={showCounts}
+              />
+            </Form.Item>
           ),
         },
       ],
@@ -42,20 +43,12 @@ function PropertyFilterOptionsMenuItems({
       children: [
         {
           key: 'intrumentType',
-          style: {
-            width: '100%',
-            height: '100%',
-            marginLeft: 0,
-            overflow: 'scroll',
-          },
+          style: { width: '100%', marginLeft: 0 },
           label: (
             <Form.Item<SearchFields>
               name={['propertyFilterOptions', 'instrument_type']}
               rules={[{ required: false }]}
-              style={{
-                width: '100%',
-                height: '100%',
-              }}
+              style={{ width: '100%', marginBottom: 0 }}
             >
               <FilterTable
                 filterOptions={propertyFilterOptions?.instrument_type ?? []}
@@ -74,20 +67,12 @@ function PropertyFilterOptionsMenuItems({
       children: [
         {
           key: 'msType',
-          style: {
-            width: '100%',
-            height: '100%',
-            marginLeft: 0,
-            overflow: 'scroll',
-          },
+          style: { width: '100%', marginLeft: 0 },
           label: (
             <Form.Item<SearchFields>
               name={['propertyFilterOptions', 'ms_type']}
               rules={[{ required: false }]}
-              style={{
-                width: '100%',
-                height: '100%',
-              }}
+              style={{ width: '100%', marginBottom: 0 }}
             >
               <FilterTable
                 filterOptions={propertyFilterOptions?.ms_type ?? []}
@@ -106,20 +91,12 @@ function PropertyFilterOptionsMenuItems({
       children: [
         {
           key: 'ionMode',
-          style: {
-            width: '100%',
-            height: '100%',
-            marginLeft: 0,
-            overflow: 'scroll',
-          },
+          style: { width: '100%', marginLeft: 0 },
           label: (
             <Form.Item<SearchFields>
               name={['propertyFilterOptions', 'ion_mode']}
               rules={[{ required: false }]}
-              style={{
-                width: '100%',
-                height: '100%',
-              }}
+              style={{ width: '100%', marginBottom: 0 }}
             >
               <FilterTable
                 filterOptions={propertyFilterOptions?.ion_mode ?? []}

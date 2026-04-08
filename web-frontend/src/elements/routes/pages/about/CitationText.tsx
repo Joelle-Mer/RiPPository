@@ -22,7 +22,7 @@ function CitationText() {
           }}
         >
           <Text style={{ width: '100%', textAlign: 'left' }}>
-            Please cite MassBank using the following reference:
+            Please cite RiPPository using the following reference:
           </Text>
           <br />
           <Text
@@ -32,12 +32,11 @@ function CitationText() {
               paddingLeft: 30,
             }}
           >
-            Steffen Neumann, René Meier, Michael Wenk, Anjana Elapavalore,
-            Takaaki Nishioka, Tobias Schulze, Michael Stravs, Hiroshi Tsugawa,
-            Fumio Matsuda, Emma L Schymanski, MassBank: an open and FAIR mass
-            spectral data resource, Nucleic Acids Research, 2025;, gkaf1193,{' '}
-            <a href="https://doi.org/10.1093/nar/gkaf1193" target="_blank">
-              https://doi.org/10.1093/nar/gkaf1193
+            RiPPository: an open-access spectral library for ribosomally
+            synthesized and post-translationally modified peptides (RiPPs).
+            Leiden University &amp; Wageningen University &amp; Research.{' '}
+            <a href="https://github.com/Joelle-Mer/RiPPository" target="_blank">
+              https://github.com/Joelle-Mer/RiPPository
             </a>
           </Text>
         </Paragraph>
