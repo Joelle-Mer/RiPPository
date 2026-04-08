@@ -25,46 +25,53 @@ If you use RiPPository in your research, please cite:
 
 > Mergola Greef, J. RiPPository: an open-access spectral library for ribosomally synthesized and post-translationally modified peptides (RiPPs). Leiden University & Wageningen University & Research. https://github.com/Joelle-Mer/RiPPository
 
-## Installation
+## Development Setup
 
-There are currently two ways to run RiPPository:
+> **Note:** A production-ready Docker deployment with a public data release is not yet available. The instructions below are for local development.
 
-1. Docker Compose
-2. Kubernetes/Helm Charts
+### Prerequisites
 
-### Docker Compose
+- [Docker](https://docs.docker.com/get-docker/) and Docker Compose
+- [Node.js](https://nodejs.org/) (v18 or later) for frontend development
+- [Go](https://go.dev/) (v1.23 or later) for backend development
 
-Make sure that Docker and Docker Compose are installed and ready to use.
+### Running locally
 
 Clone the repository:
 
     git clone https://github.com/Joelle-Mer/RiPPository.git
+    cd RiPPository
 
-The directory _compose_ contains the _env.dist_ file which serves as a template for environment variables. Copy it to _.env_:
+Copy the environment template:
 
-    cd RiPPository/compose && cp env.dist .env
+    cd compose && cp env.dist .env
 
-Download the latest RiPPository data release and place it in the data directory:
+Edit `.env` to set `MB_DATA_DIRECTORY` to a local folder containing your RiPP record `.txt` files, and set `MB_DB_INIT=true` on first run.
 
-    mkdir ../data && wget https://github.com/Joelle-Mer/RiPPository/releases/latest/download/data.tar.gz && tar -xf data.tar.gz -C ../data/ && rm data.tar.gz
-
-Start the system:
+Start the backend services:
 
     docker compose up -d
 
-> **Note:** On first start, the property _MB_DB_INIT_ is set to _true_. Change it to _false_ after the database has been populated.
+The API will be available at `http://localhost:8081/RiPPository-api`.
 
-Stop the system:
+#### Frontend (development mode)
 
-    docker compose down
+    cd web-frontend
+    cp .env.local.example .env.local  # or edit .env.local manually
+    npm install
+    npm run dev
 
-### Kubernetes/Helm Charts
+The frontend will be available at `http://localhost:3000/RiPPository`.
 
-Helm chart deployment is not yet available for RiPPository.
+#### Frontend (production build)
+
+    cd web-frontend
+    npm run build
+    npm run start
 
 ## Frontend
 
-The frontend is accessible at http://localhost:8080/RiPPository by default.
+The frontend is accessible at `http://localhost:8080/RiPPository` by default when running via Docker Compose.
 
 ## License
 
