@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/MassBank/MassBank3/pkg/massbank"
+	"github.com/Joelle-Mer/RiPPository/pkg/massbank"
 )
 
 func ConvertMb3RecordToJsonString(record *MbRecord) (string, error) {

@@ -12,12 +12,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/MassBank/MassBank3/pkg/config"
-	"github.com/MassBank/MassBank3/pkg/mb3server"
+	"github.com/Joelle-Mer/RiPPository/pkg/config"
+	"github.com/Joelle-Mer/RiPPository/pkg/mb3server"
 	"github.com/go-git/go-git/v5"
 
-	"github.com/MassBank/MassBank3/pkg/database"
-	"github.com/MassBank/MassBank3/pkg/massbank"
+	"github.com/Joelle-Mer/RiPPository/pkg/database"
+	"github.com/Joelle-Mer/RiPPository/pkg/massbank"
 )
 
 func main() {

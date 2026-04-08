@@ -60,7 +60,7 @@ Stop the system:
 
 ### Kubernetes/Helm Charts
 
-A description is available at https://github.com/MassBank/MassBank-charts.
+Helm chart deployment is not yet available for RiPPository.
 
 ## Frontend
 

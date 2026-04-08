@@ -3,7 +3,7 @@ import { JSX, memo } from 'react';
 import SectionDivider from '../../../basic/SectionDivider';
 import AcknowledgementNFDI4Chem from '../../../common/AcknowledgementNFDI4Chem';
 import Segmented from '../../../basic/Segmented';
-import RiPPositoryInfo from './MassBankInfo';
+import RiPPositoryInfo from './RiPPositoryInfo';
 import FeaturesOverview from './FeaturesOverview';
 import { usePropertiesContext } from '../../../../context/properties/properties';
 import FreeText from '../../../basic/FreeText';

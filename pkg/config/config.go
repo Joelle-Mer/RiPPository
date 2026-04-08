@@ -7,7 +7,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/MassBank/MassBank3/pkg/database"
+	"github.com/Joelle-Mer/RiPPository/pkg/database"
 )
 
 type ToolConfig struct {
@@ -27,19 +27,19 @@ type ServerConfig struct {
 
 const (
 	dbDefault              = "postgres"
-	dbUserDefault          = "massbank3"
-	dbPasswordDefault      = "massbank3password"
+	dbUserDefault          = "rippository"
+	dbPasswordDefault      = "rippositorypassword"
 	dbHostDefault          = "localhost"
 	dbPortDefault          = "5432"
-	dbNameDefault          = "massbank3"
+	dbNameDefault          = "rippository"
 	dbConnStringDefault    = ""
-	mbGitRepoDefault       = "https://github.com/MassBank/MassBank-data"
+	mbGitRepoDefault       = "https://github.com/Joelle-Mer/RiPPository-data"
 	mbGitBranchDefault     = "main"
 	mbDataDirectoryDefault = ""
 	mbDbInitDefault        = "true"
 	serverPortDefault      = "8080"
 	apiUrlDefault          = "localhost:8081"
-	baseUrlDefault         = "/MassBank-api"
+	baseUrlDefault         = "/RiPPository-api"
 )
 
 var toolConfig *ToolConfig = nil

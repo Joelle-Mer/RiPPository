@@ -22,7 +22,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 const backendUrl =
   process.env.MB3_API_URL && process.env.MB3_API_URL.trim().length > 0
     ? process.env.MB3_API_URL.replace(/\/$/, '')
-    : 'http://localhost:8081/MassBank-api';
+    : 'http://localhost:8081/RiPPository-api';
 const frontendUrl = process.env.MB3_FRONTEND_URL ?? 'http://localhost:8080';
 const frontendBaseUrlTemp =
   process.env.MB3_FRONTEND_BASE_URL &&
@@ -31,25 +31,25 @@ const frontendBaseUrlTemp =
     : '/';
 const frontendBaseUrl = frontendBaseUrlTemp.replace(/\/$/, '');
 const exportServiceUrl =
-  process.env.EXPORT_SERVICE_URL ?? 'http://localhost:8083/MassBank-export';
+  process.env.EXPORT_SERVICE_URL ?? 'http://localhost:8083/RiPPository-export';
 const pathToHtmlHeadFile = process.env.HTML_HEAD_FILE ?? '';
 const pathToHtmlBodyFile = process.env.HTML_BODY_FILE ?? '';
 const backendUrlInternal =
   process.env.MB3_API_URL_INTERNAL &&
   process.env.MB3_API_URL_INTERNAL.trim().length > 0
     ? process.env.MB3_API_URL_INTERNAL.replace(/\/$/, '')
-    : 'http://mb3server:8080/MassBank-api';
+    : 'http://mb3server:8080/RiPPository-api';
 const exportServiceUrlInternal =
   process.env.EXPORT_SERVICE_URL_INTERNAL ??
-  'http://export-service:8080/MassBank-export';
+  'http://export-service:8080/RiPPository-export';
 const distributorText =
   process.env.DISTRIBUTOR_TEXT ??
   'This website is hosted and distributed by ...';
 const distributorUrl = process.env.DISTRIBUTOR_URL ?? '';
 const browserTabTitle =
-  process.env.MB3_FRONTEND_BROWSER_TAB_TITLE ?? 'MassBank3';
+  process.env.MB3_FRONTEND_BROWSER_TAB_TITLE ?? 'RiPPository';
 const homepageIntroText =
-  process.env.MB3_FRONTEND_HOMEPAGE_INTRO_TEXT ?? 'Welcome to MassBank3!';
+  process.env.MB3_FRONTEND_HOMEPAGE_INTRO_TEXT ?? 'Welcome to RiPPository!';
 const homepageNewsSectionText =
   process.env.MB3_FRONTEND_HOMEPAGE_NEWS_SECTION_TEXT ?? '';
 const homepageFundingSectionText =
@@ -259,7 +259,7 @@ baseRouter.get(/\/sitemap_\d+\.xml/, async (req: Request, res: Response) => {
 });
 
 // Redirect previous Result.jsp requests to the frontend search page
-// This is a workaround for the old MassBank frontend which used Result.jsp
+// This is a workaround for the old MassBank/RiPPository frontend which used Result.jsp
 // to display search results. Redirect of requests to the new frontend search page.
 baseRouter.get(/\/(R|r)esult\.jsp/, (req: Request, res: Response) => {
   try {

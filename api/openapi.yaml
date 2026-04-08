@@ -1,9 +1,8 @@
 openapi: 3.0.3
 info:
-  title: "MassBank3 API"
+  title: "RiPPository API"
   version: "3.0"
-  description: "The MassBank3 API allows retrieval and filtering of records by chemical or experimental parameters, 
-  similarity search on peak lists, and access to individual record details, metadata, service status, and available filter options."
+  description: "The RiPPository API allows retrieval and filtering of RiPP records by chemical or experimental parameters, similarity search on peak lists, and access to individual record details, metadata, service status, and available filter options."
 paths:
   /records:
     parameters:
@@ -78,11 +77,11 @@ paths:
         schema:
           type: string
     get:
-      summary: Get a MassBank record.
+      summary: Get a RiPPository record.
       operationId: getRecord
       responses:
         "200":
-          description: "A MassBank record."
+          description: "A RiPPository record."
           content:
             application/json:
               schema:
@@ -97,11 +96,11 @@ paths:
         schema:
           type: string
     get:
-      summary: Get a MassBank record in with reduced information level (accession, title, peaks, smiles).
+      summary: Get a RiPPository record with reduced information level (accession, title, peaks, smiles).
       operationId: getSimpleRecord
       responses:
         "200":
-          description: "A simple MassBank record (accession, title, peaks, smiles)"
+          description: "A simple RiPPository record (accession, title, peaks, smiles)"
           content:
             application/json:
               schema:
@@ -154,12 +153,12 @@ paths:
       operationId: getVersion
       responses:
         "200":
-          description: "Version for MassBank API with timestamp of build."
+          description: "Version for RiPPository API with timestamp of build."
           content:
             application/json:
               schema:
                 type: string
-                example: MassBank API service 0.1, 2025-01-22T14:20:57+01:00
+                example: RiPPository API service 0.1, 2025-01-22T14:20:57+01:00
 
   /status:
     get:

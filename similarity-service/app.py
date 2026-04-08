@@ -21,7 +21,7 @@ spectra_dict: dict[str, Spectrum] = {}
 
 
 def load_all_spectra() -> None:
-    data_dir = os.getenv("DATA_DIR", "/MassBank-data")
+    data_dir = os.getenv("DATA_DIR", "/RiPP-data")
     count = 0
     for txt_file in pathlib.Path(data_dir).rglob("*.txt"):
         try:

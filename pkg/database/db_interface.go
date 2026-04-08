@@ -6,10 +6,10 @@ import (
 
 	"github.com/Code-Hex/dd"
 
-	"github.com/MassBank/MassBank3/pkg/massbank"
+	"github.com/Joelle-Mer/RiPPository/pkg/massbank"
 )
 
-// Filters is the abstract description of filters used to find MassBank records
+// Filters is the abstract description of filters used to find RiPP records
 // in the database
 type Filters struct {
 	InstrumentType *[]string
@@ -117,7 +117,7 @@ type MB3MetaData struct {
 	IsomerCount    int
 }
 
-// MB3Database This is the Interface which has to be implemented for databases using MassBank3
+// MB3Database This is the Interface which has to be implemented for RiPPository databases
 //
 // Any database can be used as in the backend as long as it defines the interface.
 type MB3Database interface {
@@ -130,30 +130,30 @@ type MB3Database interface {
 
 	Ping() error
 
-	// Count MassBank records in the database.
+	// Count RiPP records in the database.
 	Count() (int64, error)
 
 	// Initialises the database.
 	Init() error
 
-	// GetRecord gets a single MassBank record by the Accession string.
+	// GetRecord gets a single RiPP record by the Accession string.
 	// It should return nil and a [NotFoundError] if the record is not in the
 	// database.
 	GetRecord(*string) (*massbank.MassBank2, error)
 
 	GetRecords(*[]string) (*[]string, error)
 
-	// GetSimpleRecord gets a single simple MassBank record by the Accession string.
+	// GetSimpleRecord gets a single simple RiPP record by the Accession string.
 	// It should return nil and a [NotFoundError] if the record is not in the
 	// database.
 	GetSimpleRecord(*string) (*massbank.MassBank2, error)
 
-	// GetSimpleRecords Get an array of MassBank records by filtering
+	// GetSimpleRecords Get an array of RiPP records by filtering
 	//
 	// Will return an empty list if the filter does not match any records.
 	GetSearchResults(filters Filters) (*[]string, *[]int32, error)
 
-	// GetRecordsBySubstructure Get an array of MassBank accessions by filtering by substructure
+	// GetRecordsBySubstructure Get an array of RiPP accessions by filtering by substructure
 	//
 	// Will return an empty list if the filter does not match any records.
 	GetAccessionsBySubstructure(substructure string) ([]string, []int32, error)
@@ -162,7 +162,7 @@ type MB3Database interface {
 
 	NeutralLossSearch(neutralLoss *[]float64, tolerance *float64, minRelIntensity *int64) ([]string, []int32, map[string][]string, error)
 
-	// GetRecordsBySubstructure Get an array of MassBank records by filtering by substructure
+	// GetRecordsBySubstructure Get an array of RiPP records by filtering by substructure
 	//
 	// Will return an empty list if the filter does not match any records.
 	GetRecordsBySubstructure(substructure string) (*[]massbank.MassBank2, error)
@@ -171,10 +171,10 @@ type MB3Database interface {
 	GetUniqueValues(filters Filters) (MB3Values, error)
 
 	GetMetadata() (*massbank.MbMetaData, error)
-	// GetVersion returns the version of the MassBank PostGres database.
+	// GetVersion returns the version of the RiPPository PostgreSQL database.
 	GetVersion() (string, error)
 
-	// UpdateMetadata updates the metadata describing the MassBank version.
+	// UpdateMetadata updates the metadata describing the RiPPository version.
 	// Provides the database id of an existing entry if it is already in the
 	// database.
 	//
@@ -194,14 +194,14 @@ type MB3Database interface {
 	//AddIndexes adds indexes to the database.
 	AddIndexes() error
 
-	// AddRecord adds a new MassBank record to the database. If the Accession
+	// AddRecord adds a new RiPP record to the database. If the Accession
 	// id already exists it will return an error.
 	//
 	// The second parameter is the database id of the version information. You
 	// can get it from [UpdateMetadata].
 	AddRecord(record *massbank.MassBank2, metaDataId string, mb3RecordJson string) error
 
-	// AddRecords adds a list of MassBank records given as an array to the
+	// AddRecords adds a list of RiPP records given as an array to the
 	// database. If one of the Accession ids  exists the  function should roll
 	// back the transaction and return an error.
 	//

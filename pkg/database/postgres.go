@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/MassBank/MassBank3/pkg/massbank"
+	"github.com/Joelle-Mer/RiPPository/pkg/massbank"
 	"github.com/lib/pq"
 )
 

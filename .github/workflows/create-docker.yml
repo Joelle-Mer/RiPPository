@@ -13,25 +13,25 @@ jobs:
       matrix:
         include:
           - dockerfile: ./Dockerfile-dbtool
-            image: quay.io/massbank/massbank-dbtool
+            image: ghcr.io/joelle-mer/rippository-dbtool
             context: .
           - dockerfile: ./Dockerfile-server
-            image: quay.io/massbank/massbank-api
+            image: ghcr.io/joelle-mer/rippository-api
             context: .
           - dockerfile: ./web-frontend/Dockerfile-frontend
-            image: quay.io/massbank/massbank-frontend
+            image: ghcr.io/joelle-mer/rippository-frontend
             context: ./web-frontend
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Login to quay.io
+      - name: Login to ghcr.io
         uses: docker/login-action@v3
         with:
-          registry: quay.io
-          username: ${{ secrets.QUAY_USERNAME }}
-          password: ${{ secrets.QUAY_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Docker meta
         id: meta

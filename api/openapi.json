@@ -1,8 +1,8 @@
 {
   "openapi" : "3.0.3",
   "info" : {
-    "description" : "The MassBank3 API allows retrieval and filtering of records by chemical or experimental parameters, similarity search on peak lists, and access to individual record details, metadata, service status, and available filter options.",
-    "title" : "MassBank3 API",
+    "description" : "The RiPPository API allows retrieval and filtering of records by chemical or experimental parameters, similarity search on peak lists, and access to individual record details, metadata, service status, and available filter options.",
+    "title" : "RiPPository API",
     "version" : "3.0"
   },
   "servers" : [ {
@@ -367,10 +367,10 @@
                 }
               }
             },
-            "description" : "A MassBank record."
+            "description" : "A RiPPository record."
           }
         },
-        "summary" : "Get a MassBank record."
+        "summary" : "Get a RiPPository record."
       }
     },
     "/records/{accession}/simple" : {
@@ -396,10 +396,10 @@
                 }
               }
             },
-            "description" : "A simple MassBank record (accession, title, peaks, smiles)"
+            "description" : "A simple RiPPository record (accession, title, peaks, smiles)"
           }
         },
-        "summary" : "Get a MassBank record in with reduced information level (accession, title, peaks, smiles)."
+        "summary" : "Get a RiPPository record with reduced information level (accession, title, peaks, smiles)."
       }
     },
     "/records/count" : {
@@ -501,12 +501,12 @@
             "content" : {
               "application/json" : {
                 "schema" : {
-                  "example" : "MassBank API service 0.1, 2025-01-22T14:20:57+01:00",
+                  "example" : "RiPPository API service 0.1, 2025-01-22T14:20:57+01:00",
                   "type" : "string"
                 }
               }
             },
-            "description" : "Version for MassBank API with timestamp of build."
+            "description" : "Version for RiPPository API with timestamp of build."
           }
         },
         "summary" : "Get the current API version."
@@ -1504,7 +1504,7 @@
         "description" : "A record with similarity score.",
         "properties" : {
           "accession" : {
-            "description" : "MassBank accession id.",
+            "description" : "RiPPository accession id.",
             "type" : "string"
           },
           "score" : {
