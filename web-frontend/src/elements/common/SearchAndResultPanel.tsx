@@ -107,6 +107,7 @@ function SearchAndResultPanel({
           <Splitter.Panel
             size={panelWidths.searchPanel}
             min={200 + collapseButtonWidth}
+            style={{ overflow: 'hidden' }}
           >
             {searchPanel}
           </Splitter.Panel>
@@ -114,6 +115,7 @@ function SearchAndResultPanel({
             size={panelWidths.resultPanel}
             min={700}
             resizable={panelWidths.searchPanel !== collapseButtonWidth}
+            style={{ overflowX: 'auto', overflowY: 'hidden' }}
           >
             <Content
               style={{

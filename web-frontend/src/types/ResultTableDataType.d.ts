@@ -6,6 +6,7 @@ type ResultTableDataType = {
   accessionRaw: string;
   title: string;
   rippType: string;
+  mass: number | null;
   bioactivity: string;
   chart: JSX.Element | null;
   structure: JSX.Element | null;

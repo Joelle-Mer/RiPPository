@@ -25,6 +25,7 @@ function cosineSimilarity(
   query: { mz: number; intensity: number }[],
   target: { mz: number; intensity: number }[],
   mzTol = 0.05,
+  delta = 0,
 ): number {
   if (query.length === 0 || target.length === 0) return 0;
   const normQ = Math.sqrt(query.reduce((s, p) => s + p.intensity * p.intensity, 0));
@@ -34,7 +35,10 @@ function cosineSimilarity(
   for (const q of query) {
     let best = 0, bestDist = Infinity;
     for (const t of target) {
-      const d = Math.abs(t.mz - q.mz);
+      // Regular match (or modified cosine: also try shifted by delta)
+      const d1 = Math.abs(t.mz - q.mz);
+      const d2 = delta !== 0 ? Math.abs(t.mz - (q.mz - delta)) : Infinity;
+      const d = Math.min(d1, d2);
       if (d <= mzTol && d < bestDist) { best = t.intensity; bestDist = d; }
     }
     dot += q.intensity * best;
@@ -52,7 +56,7 @@ function submissionToHit(sub: RiPPSubmission, idx: number): Hit {
       accession: sub.accession,
       title: sub.recordTitle,
       date: { created: sub.date, modified: sub.date, updated: sub.date },
-      authors: [{ name: sub.orcidName ? `${sub.orcidName} (${sub.orcid})` : sub.orcid }],
+      authors: [{ name: sub.orcidName ?? 'Submitter' }],
       publication: (sub.dois ?? []).join(', '),
       license: sub.license,
       copyright: '',
@@ -148,6 +152,7 @@ function ContentView() {
     useState<ContentFilterOptions | null>(null);
   const [searchPanelWidth, setSearchPanelWidth] = useState<number>(defaultSearchPanelWidth);
   const [queryPeaks, setQueryPeaks] = useState<Peak[] | null>(null);
+  const [queryMass, setQueryMass] = useState<number | null>(null);
 
   const handleOnFetchContent = useCallback(async () => {
     const subs = getAllSubmissions();
@@ -205,16 +210,21 @@ function ContentView() {
     // Spectral similarity filter
     let similarityScores: Map<RiPPSubmission, number> | null = null;
     const peakListRaw = (formData?.spectralSearchFilterOptions?.similarity?.peakList ?? '').trim();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const qMass: number | undefined = (formData as any)?.spectralSearchFilterOptions?.similarity?.queryMass;
+    setQueryMass(qMass ?? null);
     if (peakListRaw) {
       const parsed = parsePeakList(peakListRaw);
       if (parsed && parsed.length > 0) {
         const parsedPeaks: Peak[] = parsed.map((p, i) => ({ ...p, id: String(i) }));
         setQueryPeaks(parsedPeaks);
         const threshold = formData?.spectralSearchFilterOptions?.similarity?.threshold ?? 0.8;
+        const useModifiedCosine = qMass != null && !isNaN(qMass) && qMass > 0;
         const scored = subs
           .map((s) => {
             const targetPeaks = (s.peaks ?? []) as { mz: number; intensity: number }[];
-            const score = cosineSimilarity(parsed, targetPeaks);
+            const delta = useModifiedCosine ? qMass! - (s.exactMass ?? 0) : 0;
+            const score = cosineSimilarity(parsed, targetPeaks, 0.05, delta);
             return { sub: s, score };
           })
           .filter(({ score }) => score >= threshold)
@@ -351,9 +361,26 @@ function ContentView() {
               <Form.Item
                 name={['spectralSearchFilterOptions', 'similarity', 'threshold']}
                 label="Min. similarity"
-                style={{ marginBottom: queryPeaks ? 10 : 0 }}
+                style={{ marginBottom: 10 }}
               >
                 <InputNumber min={0} max={1} step={0.05} style={{ width: '100%' }} />
+              </Form.Item>
+              <Form.Item
+                name={['spectralSearchFilterOptions', 'similarity', 'queryMass']}
+                label="Peptide mass (Da)"
+                style={{ marginBottom: queryPeaks ? 10 : 0 }}
+                help={
+                  queryMass != null
+                    ? 'Using modified cosine (mass-shifted matching)'
+                    : 'Optional — enables modified cosine similarity'
+                }
+              >
+                <InputNumber
+                  placeholder="e.g. 2191.8"
+                  min={0}
+                  step={0.001}
+                  style={{ width: '100%' }}
+                />
               </Form.Item>
               {queryPeaks && queryPeaks.length > 0 && (
                 <div style={{ marginTop: 4 }}>
@@ -376,7 +403,7 @@ function ContentView() {
         },
       ],
     },
-  ], [hits, queryPeaks, queryChartWidth]);
+  ], [hits, queryPeaks, queryMass, queryChartWidth]);
 
   const searchAndResultPanel = useMemo(() => {
     const filterItems = [
@@ -418,7 +445,7 @@ function ContentView() {
   }, [
     textSearchItems, propertyFilterOptions, isCollapsed, handleOnCollapse, handleOnSubmit,
     searchPanelWidth, searchPanelHeight, width, height, hits, isSearching,
-    handleOnSelectSort, handleOnResize, initialFilterValues, queryPeaks,
+    handleOnSelectSort, handleOnResize, initialFilterValues, queryPeaks, queryMass,
   ]);
 
   return (

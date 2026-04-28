@@ -9,34 +9,12 @@ type InputProps = {
 function DownloadMenuItems({ onDownload }: InputProps) {
   const items: MenuProps['items'] = [
     {
-      key: '0_nist_msp_download',
-      label: (
-        <DownloadOptionLabel
-          label="NIST MSP"
-          format="nist_msp"
-          onDownload={onDownload}
-        />
-      ),
+      key: 'json_download',
+      label: <DownloadOptionLabel label="JSON" format="json" onDownload={onDownload} />,
     },
     {
-      key: '1_riken_msp_download',
-      label: (
-        <DownloadOptionLabel
-          label="RIKEN MSP"
-          format="riken_msp"
-          onDownload={onDownload}
-        />
-      ),
-    },
-    {
-      key: '2_rippository_download',
-      label: (
-        <DownloadOptionLabel
-          label="RiPPository"
-          format="massbank"
-          onDownload={onDownload}
-        />
-      ),
+      key: 'mgf_download',
+      label: <DownloadOptionLabel label="MGF" format="mgf" onDownload={onDownload} />,
     },
   ];
 

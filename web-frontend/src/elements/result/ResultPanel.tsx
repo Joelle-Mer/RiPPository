@@ -13,8 +13,6 @@ import SpectralHitsCarouselView from '../routes/pages/search/SpectralHitsCarouse
 import ResultTableSortOptionType from '../../types/ResultTableSortOptionType';
 import { usePropertiesContext } from '../../context/properties/properties';
 import ResultTableSortOption from '../../types/ResultTableSortOption';
-import Tooltip from '../basic/Tooltip';
-import { QuestionCircleTwoTone } from '@ant-design/icons';
 import DownloadFormat from '../../types/DownloadFormat';
 import downloadRecords from '../../utils/request/downloadRecords';
 import DownloadMenuItems from '../common/DownloadMenuItems';
@@ -222,9 +220,36 @@ function ResultPanel({
       if (hits) {
         const allLocal = hits.every((h) => h.record != null);
         if (allLocal) {
-          const data = JSON.stringify(hits.map((h) => h.record), null, 2);
-          const blob = new Blob([data], { type: 'application/json' });
-          saveAs(blob, 'rippository_records.json');
+          if (format === 'mgf') {
+            const lines: string[] = [];
+            for (const hit of hits) {
+              const r = hit.record;
+              if (!r) continue;
+              lines.push('BEGIN IONS');
+              if (r.compound?.mass) lines.push(`PEPMASS=${r.compound.mass}`);
+              lines.push(`TITLE=${r.accession ?? hit.accession}`);
+              if (r.compound?.names?.[0]) lines.push(`NAME=${r.compound.names[0]}`);
+              const ionMode = r.acquisition?.mass_spectrometry?.ion_mode;
+              if (ionMode) lines.push(`CHARGE=1${ionMode === 'POSITIVE' ? '+' : '-'}`);
+              for (const peak of r.peak?.peak?.values ?? []) {
+                lines.push(`${peak.mz} ${peak.intensity}`);
+              }
+              lines.push('END IONS');
+              lines.push('');
+            }
+            const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+            saveAs(blob, 'rippository_records.mgf');
+          } else {
+            // JSON (default) — use 'submitter' instead of 'authors'
+            const records = hits.map((h) => {
+              if (!h.record) return null;
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const { authors, ...rest } = h.record as any;
+              return { ...rest, submitter: authors };
+            }).filter(Boolean);
+            const blob = new Blob([JSON.stringify(records, null, 2)], { type: 'application/json' });
+            saveAs(blob, 'rippository_records.json');
+          }
         } else {
           await downloadRecords(
             exportServiceUrl,
@@ -251,8 +276,8 @@ function ResultPanel({
           width: '100%',
           height: paginationHeight,
           display: 'flex',
-          justifyContent: 'space-evenly',
           alignItems: 'center',
+          overflow: 'hidden',
         }}
       >
         <Pagination
@@ -281,7 +306,8 @@ function ResultPanel({
           showQuickJumper
           locale={{ jump_to: 'Page', page: '' }}
           style={{
-            width: '100%',
+            flex: '1 1 0',
+            minWidth: 0,
             height: '100%',
             display: 'flex',
             justifyContent: 'center',
@@ -292,31 +318,15 @@ function ResultPanel({
         <Dropdown menu={{ items: downloadMenuItems }} trigger={['click']}>
           <Button
             style={{
+              flexShrink: 0,
               width: 100,
               marginLeft: 10,
+              marginRight: 10,
             }}
           >
             Download
           </Button>
         </Dropdown>
-        <Tooltip
-          title={
-            'Double click on a row in the result table to open the carousel view. In addition to clicking through the results, it also offers an interactive chart or mirror chart (similarity/peak search). In case of a neutral loss search it provides an additional interactive result table.'
-          }
-          placement="left"
-        >
-          <QuestionCircleTwoTone
-            style={{
-              width: '50px',
-              fontSize: '18px',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              marginLeft: 10,
-              marginRight: 20,
-            }}
-          />
-        </Tooltip>
       </Content>
     ),
     [

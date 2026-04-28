@@ -39,6 +39,7 @@ export type SpectrumEntry = {
 export type RiPPSubmission = {
   orcid: string;
   orcidName?: string;
+  contactEmail?: string;
   accession: string; recordTitle: string; date: string; license: 'CC BY-SA';
   exactMass: number | null; numPeak: number;
   status: 'Pending' | 'Approved' | 'Rejected'; submittedAt: string;
@@ -53,6 +54,7 @@ export type RiPPSubmission = {
   bioactivity?: Array<{ activity: string; target?: string; mic?: string; ic50?: string }>;
   origin?: { organism?: string; strain?: string; source?: string; geography?: string };
   genome?: { mibig?: string; genbank?: string; bgcStart?: number; bgcEnd?: number };
+  prUrl?: string;
 };
 
 function generateAccession(): string {
@@ -61,6 +63,150 @@ function generateAccession(): string {
   );
   const next = stored.length + 1;
   return 'RIPPOS-LU-' + String(next).padStart(4, '0');
+}
+
+// ── MassBank record formatter ────────────────────────────────────────────────
+function formatMassBankRecord(sub: RiPPSubmission): string {
+  const lines: string[] = [];
+  const push = (line: string) => lines.push(line);
+
+  push(`ACCESSION: ${sub.accession}`);
+  push(`RECORD_TITLE: ${sub.recordTitle}`);
+  push(`DATE: ${sub.date.replace(/-/g, '.')}`);
+  const author = sub.orcidName
+    ? `${sub.orcidName} (ORCID:${sub.orcid})`
+    : `ORCID:${sub.orcid}`;
+  push(`AUTHORS: ${author}`);
+  push(`LICENSE: ${sub.license}`);
+  push('');
+
+  push(`CH$NAME: ${sub.compoundName}`);
+  const cls = ['Natural Product', 'RiPP', sub.compoundClass, sub.compoundSubClass]
+    .filter(Boolean).join('; ');
+  push(`CH$COMPOUND_CLASS: ${cls}`);
+  push(`CH$FORMULA: ${sub.formula}`);
+  if (sub.exactMass != null) push(`CH$EXACT_MASS: ${sub.exactMass.toFixed(4)}`);
+  if (sub.smiles) push(`CH$SMILES: ${sub.smiles}`);
+  if (sub.inchi) push(`CH$IUPAC: ${sub.inchi}`);
+  if (sub.dbLinks) {
+    for (const { db, id } of sub.dbLinks) push(`CH$LINK: ${db} ${id}`);
+  }
+  push('');
+
+  if (sub.origin) {
+    if (sub.origin.organism) push(`SP$SCIENTIFIC_NAME: ${sub.origin.organism}`);
+    if (sub.origin.strain) push(`SP$LINEAGE: strain: ${sub.origin.strain}`);
+    if (sub.origin.source) push(`SP$SAMPLE: ${sub.origin.source}`);
+    if (sub.origin.geography) push(`SP$GEOGRAPHY: ${sub.origin.geography}`);
+    push('');
+  }
+
+  const spectraList = sub.spectra && sub.spectra.length > 0 ? sub.spectra : [sub];
+  for (const s of spectraList) {
+    push(`AC$INSTRUMENT: ${s.instrument}`);
+    push(`AC$INSTRUMENT_TYPE: ${s.instrumentType}`);
+    push(`AC$MASS_SPECTROMETRY: MS_TYPE ${s.msType}`);
+    push(`AC$MASS_SPECTROMETRY: ION_MODE ${s.ionMode?.toUpperCase()}`);
+    if (s.collisionEnergy) push(`AC$MASS_SPECTROMETRY: COLLISION_ENERGY ${s.collisionEnergy}`);
+    if (s.ionization) push(`AC$MASS_SPECTROMETRY: IONIZATION ${s.ionization}`);
+    if (s.precursorType) push(`MS$FOCUSED_ION: PRECURSOR_TYPE ${s.precursorType}`);
+    push('');
+  }
+
+  for (const doi of sub.dois) push(`COMMENT: Publication DOI: ${doi}`);
+  if (sub.precursorSeq) push(`COMMENT: PRECURSOR_SEQ ${sub.precursorSeq}`);
+  if (sub.genome?.mibig) push(`COMMENT: MiBIG ${sub.genome.mibig}`);
+  if (sub.genome?.genbank) push(`COMMENT: GenBank ${sub.genome.genbank}`);
+  if (sub.note) push(`COMMENT: ${sub.note}`);
+  if (sub.bioactivity) {
+    for (const b of sub.bioactivity) {
+      const parts = [b.activity, b.target && `target: ${b.target}`, b.mic && `MIC: ${b.mic}`, b.ic50 && `IC50: ${b.ic50}`].filter(Boolean);
+      push(`COMMENT: BIOACTIVITY ${parts.join('; ')}`);
+    }
+  }
+  push('');
+
+  if (sub.splash) push(`PK$SPLASH: ${sub.splash}`);
+  push(`PK$NUM_PEAK: ${sub.peaks.length}`);
+  push('PK$PEAK: m/z int. rel.int.');
+  for (const p of sub.peaks) {
+    push(`  ${p.mz.toFixed(4)} ${p.intensity.toFixed(4)} ${p.rel}`);
+  }
+  push('//');
+
+  return lines.join('\n');
+}
+
+// ── GitHub PR creator ────────────────────────────────────────────────────────
+const GH_TOKEN = import.meta.env.VITE_GITHUB_TOKEN as string | undefined;
+const GH_OWNER = (import.meta.env.VITE_GITHUB_OWNER as string | undefined) ?? 'Joelle-Mer';
+const GH_REPO = (import.meta.env.VITE_GITHUB_DATA_REPO as string | undefined) ?? 'RiPPository-data';
+const GH_BASE = (import.meta.env.VITE_GITHUB_BASE_BRANCH as string | undefined) ?? 'main';
+
+async function createGitHubPR(sub: RiPPSubmission, recordContent: string): Promise<string> {
+  if (!GH_TOKEN) throw new Error('GitHub token not configured (VITE_GITHUB_TOKEN).');
+  const headers: Record<string, string> = {
+    Authorization: `token ${GH_TOKEN}`,
+    Accept: 'application/vnd.github.v3+json',
+    'Content-Type': 'application/json',
+  };
+  const apiBase = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}`;
+
+  // 1. Get SHA of base branch
+  const refRes = await fetch(`${apiBase}/git/ref/heads/${GH_BASE}`, { headers });
+  if (!refRes.ok) throw new Error(`Could not get branch ref: ${await refRes.text()}`);
+  const baseSha: string = (await refRes.json()).object.sha;
+
+  // 2. Create submission branch
+  const branchName = `submission/${sub.accession.toLowerCase()}`;
+  const branchRes = await fetch(`${apiBase}/git/refs`, {
+    method: 'POST', headers,
+    body: JSON.stringify({ ref: `refs/heads/${branchName}`, sha: baseSha }),
+  });
+  if (!branchRes.ok) throw new Error(`Could not create branch: ${await branchRes.text()}`);
+
+  // 3. Add record file (Base64-encode UTF-8 content)
+  const encoded = btoa(unescape(encodeURIComponent(recordContent)));
+  const filePath = `RiPP-data/${sub.accession}.txt`;
+  const fileRes = await fetch(`${apiBase}/contents/${filePath}`, {
+    method: 'PUT', headers,
+    body: JSON.stringify({
+      message: `submission: ${sub.compoundName} (${sub.accession})`,
+      content: encoded,
+      branch: branchName,
+    }),
+  });
+  if (!fileRes.ok) throw new Error(`Could not create file: ${await fileRes.text()}`);
+
+  // 4. Open pull request
+  const submittedDate = new Date(sub.submittedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  const prBody = [
+    `## New RiPP Submission`,
+    ``,
+    `| Field | Value |`,
+    `|-------|-------|`,
+    `| **Accession** | \`${sub.accession}\` |`,
+    `| **Compound** | ${sub.compoundName} |`,
+    `| **Class** | ${sub.compoundClass}${sub.compoundSubClass ? ' / ' + sub.compoundSubClass : ''} |`,
+    `| **Formula** | ${sub.formula} |`,
+    `| **Submitter ORCID** | ${sub.orcid} |`,
+    ...(sub.contactEmail ? [`| **Contact Email** | ${sub.contactEmail} |`] : []),
+    `| **Submitted** | ${submittedDate} |`,
+    ``,
+    `*Submitted via the RiPPository web form.*`,
+  ].join('\n');
+
+  const prRes = await fetch(`${apiBase}/pulls`, {
+    method: 'POST', headers,
+    body: JSON.stringify({
+      title: `[Submission] ${sub.compoundName} (${sub.accession})`,
+      body: prBody,
+      head: branchName,
+      base: GH_BASE,
+    }),
+  });
+  if (!prRes.ok) throw new Error(`Could not create PR: ${await prRes.text()}`);
+  return (await prRes.json()).html_url as string;
 }
 
 const RIPP_CLASSES = [
@@ -1037,6 +1183,7 @@ function SubmitView() {
       const sub: RiPPSubmission = {
         orcid: values.orcid,
         orcidName: orcidName ?? undefined,
+        contactEmail: sanitize(values.contactEmail) || undefined,
         accession: accessionRef.current,
         recordTitle: [compoundName || '?', firstS.instrumentType || '?', firstS.msType].join('; '),
         date: today, license: 'CC BY-SA', exactMass, numPeak: firstS.peaks.length,
@@ -1071,10 +1218,26 @@ function SubmitView() {
               bgcStart: bgcStart ?? undefined, bgcEnd: bgcEnd ?? undefined }
           : undefined,
       };
+      const recordTxt = formatMassBankRecord(sub);
+      let prUrl: string | undefined;
+      try {
+        prUrl = await createGitHubPR(sub, recordTxt);
+        sub.prUrl = prUrl;
+      } catch (ghErr) {
+        console.error('GitHub PR creation failed:', ghErr);
+        messageApi.warning('Record saved locally, but could not create GitHub PR: ' + (ghErr instanceof Error ? ghErr.message : String(ghErr)), 8);
+      }
       const existing: RiPPSubmission[] = JSON.parse(localStorage.getItem(SUBMISSIONS_KEY) ?? '[]');
       existing.unshift(sub);
       localStorage.setItem(SUBMISSIONS_KEY, JSON.stringify(existing));
-      messageApi.success('Submitted! Job ID: ' + sub.accession + '. Track status in More -> My Submissions.', 7);
+      if (prUrl) {
+        messageApi.success(
+          `Submitted! A pull request has been opened for review. Track it in More → Submissions.`,
+          8,
+        );
+      } else {
+        messageApi.info('Submitted locally. Job ID: ' + sub.accession + '. Track status in More → Submissions.', 7);
+      }
       form.resetFields();
       setOrcidName(null); setOrcidLoading(false); setOrcidError(false);
       setStructureValue(''); setNote(''); setDbLinks([]);
@@ -1206,6 +1369,26 @@ function SubmitView() {
               addonBefore="orcid.org/"
               style={{ maxWidth: 420 }}
               onBlur={fetchOrcidName}
+            />
+          </Form.Item>
+
+          <Form.Item
+            label="Contact Email"
+            name="contactEmail"
+            rules={[
+              req('Contact email'),
+              { type: 'email', message: 'Enter a valid email address.' },
+            ]}
+            extra={
+              <span style={{ fontSize: 12, color: '#6b7280' }}>
+                Used only to contact you about your submission. Not displayed publicly.
+              </span>
+            }
+          >
+            <Input
+              placeholder="your@email.com"
+              type="email"
+              style={{ maxWidth: 420 }}
             />
           </Form.Item>
 
