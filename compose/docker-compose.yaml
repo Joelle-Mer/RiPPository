@@ -160,7 +160,7 @@ services:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       MB_DB_INIT: ${MB_DB_INIT}
-      MB_GIT_REPO: ""
+      MB_GIT_REPO: ${MB_GIT_REPO}
       MB_GIT_BRANCH: "main"
       MB_DATA_DIRECTORY: "/RiPP-data"
     volumes:
