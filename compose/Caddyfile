@@ -1,0 +1,6 @@
+rippository.bioinformatics.nl {
+    reverse_proxy /api/* mb3server:8080
+    reverse_proxy /export/* export-service:8080
+    reverse_proxy /similarity/* nginx:80
+    reverse_proxy * mb3frontend:3000
+}

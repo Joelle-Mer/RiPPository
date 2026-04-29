@@ -165,3 +165,4 @@ services:
       MB_DATA_DIRECTORY: "/RiPP-data"
     volumes:
       - "${MB_DATA_DIRECTORY}:/RiPP-data:ro"
+
