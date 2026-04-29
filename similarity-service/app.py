@@ -8,7 +8,7 @@ import numpy as np
 from fastapi import FastAPI
 from fastapi.responses import PlainTextResponse
 from matchms import Spectrum, calculate_scores
-from matchms.similarity import ModifiedCosine
+from matchms.similarity import ModifiedCosineGreedy
 from pydantic import BaseModel
 
 VERSION = "modified-cosine-similarity-api 0.1"
@@ -114,8 +114,8 @@ def compute_similarity(request: SimilarityRequest):
     if not refs:
         return {"similarity_score_list": []}
 
-    scores = calculate_scores(refs, [query], ModifiedCosine(tolerance=0.1))
-    matches = scores.scores_by_query(query, "ModifiedCosine_score", sort=True)
+    scores = calculate_scores(refs, [query], ModifiedCosineGreedy(tolerance=0.1))
+    matches = scores.scores_by_query(query, "ModifiedCosineGreedy_score", sort=True)
 
     result = []
     for ref, score, _ in matches:
