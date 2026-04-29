@@ -8,11 +8,50 @@ import numpy as np
 from fastapi import FastAPI
 from fastapi.responses import PlainTextResponse
 from matchms import Spectrum, calculate_scores
-from matchms.importing import load_from_massbank
 from matchms.similarity import ModifiedCosine
 from pydantic import BaseModel
 
 VERSION = "modified-cosine-similarity-api 0.1"
+
+
+def load_from_massbank(filepath: str):
+    """Parse a MassBank record .txt file and yield matchms Spectrum objects."""
+    with open(filepath, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+
+    metadata = {}
+    peaks = []
+    in_peak_block = False
+
+    for line in lines:
+        line = line.rstrip("\n")
+        if line == "//":
+            break
+        if line.startswith("ACCESSION:"):
+            metadata["accession"] = line.split(":", 1)[1].strip()
+        elif line.startswith("MS$FOCUSED_ION: PRECURSOR_MZ"):
+            try:
+                metadata["precursor_mz"] = float(line.split()[-1])
+            except ValueError:
+                pass
+        elif line.startswith("MS$FOCUSED_ION: PRECURSOR_TYPE"):
+            metadata["precursor_type"] = line.split("PRECURSOR_TYPE", 1)[1].strip()
+        elif line.startswith("PK$PEAK:"):
+            in_peak_block = True
+        elif in_peak_block:
+            parts = line.strip().split()
+            if len(parts) >= 2:
+                try:
+                    peaks.append((float(parts[0]), float(parts[1])))
+                except ValueError:
+                    in_peak_block = False
+
+    if not peaks:
+        return
+
+    mzs = np.array([p[0] for p in peaks], dtype=float)
+    intensities = np.array([p[1] for p in peaks], dtype=float)
+    yield Spectrum(mz=mzs, intensities=intensities, metadata=metadata)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
