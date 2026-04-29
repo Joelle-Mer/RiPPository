@@ -93,6 +93,20 @@ services:
     depends_on:
       - similarity-service
 
+  nginx-proxy:
+    image: nginx:latest
+    pull_policy: always
+    restart: unless-stopped
+    ports:
+      - "9410:9410"
+    volumes:
+      - ./nginx-proxy.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - mb3frontend
+      - mb3server
+      - export-service
+      - nginx
+
   export-service:
     platform: linux/amd64
     image: quay.io/massbank/massbank-export-api:latest
