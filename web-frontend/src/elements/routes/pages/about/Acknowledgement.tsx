@@ -3,7 +3,7 @@ import Typography from 'antd/es/typography';
 const { Paragraph, Text } = Typography;
 import List, { ListItemMetaProps } from 'antd/es/list';
 import { Content } from 'antd/es/layout/layout';
-import AcknowledgementNFDI4Chem from '../../../common/AcknowledgementNFDI4Chem';
+import AcknowledgementNWO from '../../../common/AcknowledgementNWO';
 
 const linkStyle: CSSProperties = {
   color: 'black',
@@ -123,7 +123,7 @@ function Acknowledgement() {
         height: '100%',
       }}
     >
-      <AcknowledgementNFDI4Chem />
+      <AcknowledgementNWO />
       <Paragraph style={{ padding: 10, marginTop: 40 }}>
         <Text
           style={{

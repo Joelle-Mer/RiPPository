@@ -1,7 +1,7 @@
 import Layout, { Content } from 'antd/es/layout/layout';
 import { JSX, memo } from 'react';
 import SectionDivider from '../../../basic/SectionDivider';
-import AcknowledgementNFDI4Chem from '../../../common/AcknowledgementNFDI4Chem';
+import AcknowledgementNWO from '../../../common/AcknowledgementNWO';
 import Segmented from '../../../basic/Segmented';
 import RiPPositoryInfo from './RiPPositoryInfo';
 import FeaturesOverview from './FeaturesOverview';
@@ -64,7 +64,7 @@ function HomeView() {
     elements.push(
       <Content>
         <SectionDivider label="Funding" />
-        <AcknowledgementNFDI4Chem />
+        <AcknowledgementNWO />
       </Content>,
     );
     elementLabels.push('Funding');
