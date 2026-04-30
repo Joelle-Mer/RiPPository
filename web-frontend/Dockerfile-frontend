@@ -8,6 +8,14 @@ RUN npm run clean-install
 COPY tsconfig.json tsconfig.node.json vite.config.ts vite-env.d.ts server.ts server-utils.ts index.html entrypoint.sh ./
 COPY src/ ./src/
 COPY public/ ./public/
+ARG VITE_GITHUB_TOKEN
+ARG VITE_GITHUB_OWNER
+ARG VITE_GITHUB_DATA_REPO
+ARG VITE_GITHUB_BASE_BRANCH
+ENV VITE_GITHUB_TOKEN=${VITE_GITHUB_TOKEN}
+ENV VITE_GITHUB_OWNER=${VITE_GITHUB_OWNER}
+ENV VITE_GITHUB_DATA_REPO=${VITE_GITHUB_DATA_REPO}
+ENV VITE_GITHUB_BASE_BRANCH=${VITE_GITHUB_BASE_BRANCH}
 RUN npm run build
 
 COPY mb_version.txt ./

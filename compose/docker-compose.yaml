@@ -135,6 +135,11 @@ services:
     build:
       context: ../web-frontend
       dockerfile: Dockerfile-frontend
+      args:
+        VITE_GITHUB_TOKEN: ${VITE_GITHUB_TOKEN}
+        VITE_GITHUB_OWNER: ${VITE_GITHUB_OWNER}
+        VITE_GITHUB_DATA_REPO: ${VITE_GITHUB_DATA_REPO}
+        VITE_GITHUB_BASE_BRANCH: ${VITE_GITHUB_BASE_BRANCH}
     restart: unless-stopped
     environment:
       MB3_API_URL: "${MB3_API_URL}"
