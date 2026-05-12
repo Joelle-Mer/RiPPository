@@ -47,7 +47,7 @@ services:
 
   mb3server:
     image: ghcr.io/joelle-mer/rippository-api:latest
-    pull_policy: always
+    pull_policy: never
     build:
       context: ..
       dockerfile: Dockerfile-server
@@ -131,7 +131,7 @@ services:
 
   mb3frontend:
     image: ghcr.io/joelle-mer/rippository-frontend:latest
-    pull_policy: always
+    pull_policy: never
     build:
       context: ../web-frontend
       dockerfile: Dockerfile-frontend
@@ -165,7 +165,7 @@ services:
 
   mb3tool:
     image: ghcr.io/joelle-mer/rippository-dbtool:latest
-    pull_policy: always
+    pull_policy: never
     build:
       context: ..
       dockerfile: Dockerfile-dbtool
