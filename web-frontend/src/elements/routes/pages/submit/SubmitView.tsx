@@ -189,8 +189,6 @@ async function createGitHubPR(sub: RiPPSubmission, recordContent: string): Promi
     `| **Compound** | ${sub.compoundName} |`,
     `| **Class** | ${sub.compoundClass}${sub.compoundSubClass ? ' / ' + sub.compoundSubClass : ''} |`,
     `| **Formula** | ${sub.formula} |`,
-    `| **Submitter ORCID** | ${sub.orcid} |`,
-    ...(sub.contactEmail ? [`| **Contact Email** | ${sub.contactEmail} |`] : []),
     `| **Submitted** | ${submittedDate} |`,
     ``,
     `*Submitted via the RiPPository web form.*`,
