@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useContainerDimensions from '../../../../utils/useContainerDimensions';
 import Hit from '../../../../types/Hit';
 import ContentFilterOptions from '../../../../types/filterOptions/ContentFilterOtions';
-import { Layout, Spin } from 'antd';
+import { Layout } from 'antd';
 import { Content } from 'antd/es/layout/layout';
 import SearchFields from '../../../../types/filterOptions/SearchFields';
 import SearchAndResultPanel from '../../../common/SearchAndResultPanel';
@@ -14,10 +14,8 @@ import sortHits from '../../../../utils/sortHits';
 import collapseButtonWidth from '../../../../constants/collapseButtonWidth';
 import ErrorElement from '../../../basic/ErrorElement';
 import fetchData from '../../../../utils/request/fetchData';
-import buildSearchParams from '../../../../utils/request/buildSearchParams';
 import initFlags from '../../../../utils/initFlags';
 import { usePropertiesContext } from '../../../../context/properties/properties';
-import propertyFilterOptionsFormDataToContentMapper from '../../../../utils/propertyFilterOptionsFormDataToContentMapper';
 import buildSearchParamsFromFormData from '../../../../utils/buildSearchParamsFromFormData';
 import Record from '../../../../types/record/Record';
 import RequestResponse from '../../../../types/RequestResponse';
@@ -29,7 +27,6 @@ function ContentView() {
   const { width, height } = useContainerDimensions(ref);
   const { backendUrl } = usePropertiesContext();
 
-  const [isFetchingContent, setIsFetchingContent] = useState<boolean>(false);
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
   const [hits, setHits] = useState<Hit[] | null>(null);
@@ -39,33 +36,13 @@ function ContentView() {
   const [searchPanelWidth, setSearchPanelWidth] = useState<number>(defaultSearchPanelWidth);
 
   const handleOnFetchContent = useCallback(
-    async (formDataContent: ContentFilterOptions | null) => {
-      setIsFetchingContent(true);
-
-      let _browseContent: ContentFilterOptions | null = formDataContent;
-      if (!_browseContent) {
-        const url = backendUrl + '/filter/browse';
-        const response = (await fetchData(url)) as RequestResponse<ContentFilterOptions>;
-        if (response.status === 'error') {
-          _browseContent = null;
-        } else {
-          _browseContent = response.data;
-        }
-      } else {
-        const builtSearchParams = buildSearchParams(_browseContent);
-        const url = backendUrl + '/filter/browse';
-        const response = (await fetchData(url, builtSearchParams)) as RequestResponse<ContentFilterOptions>;
-        if (response.status === 'error') {
-          _browseContent = null;
-        } else {
-          _browseContent = response.data;
-        }
+    async () => {
+      const url = backendUrl + '/filter/browse';
+      const response = (await fetchData(url)) as RequestResponse<ContentFilterOptions>;
+      if (response.status === 'success' && response.data) {
+        initFlags(response.data);
+        setPropertyFilterOptions(response.data);
       }
-      if (_browseContent) {
-        initFlags(_browseContent);
-      }
-      setPropertyFilterOptions(_browseContent);
-      setIsFetchingContent(false);
     },
     [backendUrl],
   );
@@ -98,18 +75,13 @@ function ContentView() {
 
   const handleOnSubmit = useCallback(
     async (formData: SearchFields) => {
-      const formDataContent = propertyFilterOptionsFormDataToContentMapper(
-        formData?.propertyFilterOptions,
-        undefined,
-      );
-      await handleOnFetchContent(formDataContent);
       await handleOnSearch(formData);
     },
-    [handleOnFetchContent, handleOnSearch],
+    [handleOnSearch],
   );
 
   useEffect(() => {
-    handleOnFetchContent(null);
+    handleOnFetchContent();
     handleOnSearch({} as SearchFields);
   }, [handleOnFetchContent, handleOnSearch]);
 
@@ -184,9 +156,7 @@ function ContentView() {
       ref={ref}
       style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', userSelect: 'none' }}
     >
-      {isFetchingContent ? (
-        <Spin size="large" />
-      ) : errorMessage && !hits ? (
+      {errorMessage && !hits ? (
         <ErrorElement message={'An error occurred while trying to fetch the content.'} />
       ) : (
         <Content style={{ width: '100%', height: '100%', backgroundColor: 'white' }}>
