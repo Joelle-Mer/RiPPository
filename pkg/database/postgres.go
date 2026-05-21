@@ -1753,7 +1753,23 @@ func (p *PostgresSQLDB) AddRecord(record *massbank.MassBank2, metaDataId string,
 	// insert into compound table
 	q = `INSERT INTO compound (inchi, formula, smiles, mass) VALUES ($1, $2, $3, $4) ON CONFLICT (inchi, formula, smiles, mass) DO UPDATE SET inchi = EXCLUDED.inchi, formula = EXCLUDED.formula, smiles = EXCLUDED.smiles, mass = EXCLUDED.mass RETURNING id;`
 	var compoundId int
-	err = tx.QueryRow(q, *record.Compound.InChI, *record.Compound.Formula, *record.Compound.Smiles, *record.Compound.Mass).Scan(&compoundId)
+	compoundInchi := ""
+	if record.Compound.InChI != nil {
+		compoundInchi = *record.Compound.InChI
+	}
+	compoundFormula := ""
+	if record.Compound.Formula != nil {
+		compoundFormula = *record.Compound.Formula
+	}
+	compoundSmiles := ""
+	if record.Compound.Smiles != nil {
+		compoundSmiles = *record.Compound.Smiles
+	}
+	compoundMass := 0.0
+	if record.Compound.Mass != nil {
+		compoundMass = *record.Compound.Mass
+	}
+	err = tx.QueryRow(q, compoundInchi, compoundFormula, compoundSmiles, compoundMass).Scan(&compoundId)
 	if err != nil {
 		if err2 := tx.Rollback(); err2 != nil {
 			return errors.New("Could not rollback after error: " + err2.Error() + "\n:" + err.Error())
