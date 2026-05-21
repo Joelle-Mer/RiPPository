@@ -31,12 +31,40 @@ func ConvertJsonStringToMb3Record(recordJson string) (*MbRecord, error) {
 	return &record, nil
 }
 
+func derefStringSlice(s *[]string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return *s
+}
+
+func derefString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+func derefFloat64(f *float64) float64 {
+	if f == nil {
+		return 0
+	}
+	return *f
+}
+
+func derefUint(u *uint) uint {
+	if u == nil {
+		return 0
+	}
+	return *u
+}
+
 func ConvertMb2RecordToMb3Record(record *massbank.MassBank2) (*MbRecord, error) {
 
 	result := MbRecord{
-		Accession:  *record.Accession,
+		Accession:  derefString(record.Accession),
 		Deprecated: MbRecordDeprecated{},
-		Title:      *record.RecordTitle,
+		Title:      derefString(record.RecordTitle),
 		Date: MbRecordDate{
 			Updated:  record.Date.Updated.String(),
 			Created:  record.Date.Created.String(),
@@ -49,12 +77,12 @@ func ConvertMb2RecordToMb3Record(record *massbank.MassBank2) (*MbRecord, error) 
 		Project:     "",
 		Comments:    nil,
 		Compound: MbRecordCompound{
-			Names:   *record.Compound.Names,
-			Classes: nil, // *record.Compound.Classes
-			Formula: *record.Compound.Formula,
-			Mass:    *record.Compound.Mass,
-			Smiles:  *record.Compound.Smiles,
-			Inchi:   *record.Compound.InChI,
+			Names:   derefStringSlice(record.Compound.Names),
+			Classes: nil,
+			Formula: derefString(record.Compound.Formula),
+			Mass:    derefFloat64(record.Compound.Mass),
+			Smiles:  derefString(record.Compound.Smiles),
+			Inchi:   derefString(record.Compound.InChI),
 			Link:    nil,
 		},
 		Species: MbRecordSpecies{
@@ -64,8 +92,8 @@ func ConvertMb2RecordToMb3Record(record *massbank.MassBank2) (*MbRecord, error) 
 			Sample:  nil,
 		},
 		Acquisition: MbRecordAcquisition{
-			Instrument:     *record.Acquisition.Instrument,
-			InstrumentType: *record.Acquisition.InstrumentType,
+			Instrument:     derefString(record.Acquisition.Instrument),
+			InstrumentType: derefString(record.Acquisition.InstrumentType),
 			MassSpectrometry: AcMassSpec{
 				MsType:  "",
 				IonMode: "",
@@ -80,12 +108,12 @@ func ConvertMb2RecordToMb3Record(record *massbank.MassBank2) (*MbRecord, error) 
 			DataProcessing: nil,
 		},
 		Peak: MbRecordPeak{
-			Splash: *record.Peak.Splash,
+			Splash: derefString(record.Peak.Splash),
 			Annotation: MbRecordPeakAnnotation{
 				Header: nil,
 				Values: nil,
 			},
-			NumPeak: int32(*record.Peak.NumPeak),
+			NumPeak: int32(derefUint(record.Peak.NumPeak)),
 			Peak: MbRecordPeakPeak{
 				Header: record.Peak.Peak.Header,
 				Values: nil,
@@ -219,10 +247,10 @@ func ConvertMb2RecordToMb3Record(record *massbank.MassBank2) (*MbRecord, error) 
 	}
 
 	// insert acquisition data
-	if *record.Acquisition.Instrument != "" {
+	if record.Acquisition.Instrument != nil && *record.Acquisition.Instrument != "" {
 		result.Acquisition.Instrument = *record.Acquisition.Instrument
 	}
-	if *record.Acquisition.InstrumentType != "" {
+	if record.Acquisition.InstrumentType != nil && *record.Acquisition.InstrumentType != "" {
 		result.Acquisition.InstrumentType = *record.Acquisition.InstrumentType
 	}
 	if record.Acquisition.Chromatography != nil {
