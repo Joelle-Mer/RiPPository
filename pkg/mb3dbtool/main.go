@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/Joelle-Mer/RiPPository/pkg/config"
 	"github.com/Joelle-Mer/RiPPository/pkg/mb3server"
@@ -86,7 +87,13 @@ func main() {
 				panic(err)
 			}
 		}
-		fmt.Println("Start updating database with", len(mbfiles), "MassBank records...")
+		if versionData == nil {
+				versionData = &massbank.MbMetaData{}
+			}
+			if versionData.Timestamp == "" {
+				versionData.Timestamp = time.Now().Format("2006-01-02T15:04:05")
+			}
+			fmt.Println("Start updating database with", len(mbfiles), "MassBank records...")
 
 		// set status to updating metadata
 		err = db.SetStatus("database_update", "updating metadata")
