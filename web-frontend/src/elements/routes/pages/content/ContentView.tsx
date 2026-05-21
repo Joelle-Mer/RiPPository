@@ -20,6 +20,7 @@ import { usePropertiesContext } from '../../../../context/properties/properties'
 import propertyFilterOptionsFormDataToContentMapper from '../../../../utils/propertyFilterOptionsFormDataToContentMapper';
 import buildSearchParamsFromFormData from '../../../../utils/buildSearchParamsFromFormData';
 import Record from '../../../../types/record/Record';
+import RequestResponse from '../../../../types/RequestResponse';
 
 const defaultSearchPanelWidth = 450;
 
