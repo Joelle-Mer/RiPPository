@@ -21,6 +21,20 @@ import RequestResponse from '../../../../types/RequestResponse';
 
 const defaultSearchPanelWidth = 450;
 
+type ActiveFilters = {
+  ripp_type: string[];
+  instrument_type: string[];
+  ion_mode: string[];
+  ms_type: string[];
+};
+
+const emptyFilters: ActiveFilters = {
+  ripp_type: [],
+  instrument_type: [],
+  ion_mode: [],
+  ms_type: [],
+};
+
 function ContentView() {
   const ref = useRef(null);
   const { width, height } = useContainerDimensions(ref);
@@ -29,7 +43,8 @@ function ContentView() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
   const [allHits, setAllHits] = useState<Hit[]>([]);
-  const [hits, setHits] = useState<Hit[] | null>(null);
+  const [sortedHits, setSortedHits] = useState<Hit[] | null>(null);
+  const [activeFilters, setActiveFilters] = useState<ActiveFilters>(emptyFilters);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [propertyFilterOptions, setPropertyFilterOptions] =
     useState<ContentFilterOptions | null>(null);
@@ -37,16 +52,12 @@ function ContentView() {
 
   useEffect(() => {
     async function loadData() {
-      setIsLoading(true);
-
-      // Fetch filter options
       const browseResponse = (await fetchData(backendUrl + '/filter/browse')) as RequestResponse<ContentFilterOptions>;
       if (browseResponse.status === 'success' && browseResponse.data) {
         initFlags(browseResponse.data);
         setPropertyFilterOptions(browseResponse.data);
       }
 
-      // Fetch all records
       const recordsResponse = await fetchData(backendUrl + '/records');
       if (recordsResponse.status === 'error') {
         setErrorMessage('Failed to load records.');
@@ -61,32 +72,42 @@ function ContentView() {
         record: rec,
       }));
       setAllHits(loaded);
-      setHits(loaded);
       setIsLoading(false);
     }
     loadData();
   }, [backendUrl]);
 
+  // Derive filtered hits from allHits + activeFilters — no setState, no loops
+  const filteredHits = useMemo<Hit[]>(() => {
+    let result = allHits;
+    if (activeFilters.ripp_type.length > 0)
+      result = result.filter((h) => activeFilters.ripp_type.includes(h.record?.compound?.classes?.[0] ?? ''));
+    if (activeFilters.instrument_type.length > 0)
+      result = result.filter((h) => activeFilters.instrument_type.includes(h.record?.acquisition?.instrument_type ?? ''));
+    if (activeFilters.ion_mode.length > 0)
+      result = result.filter((h) => activeFilters.ion_mode.includes(h.record?.acquisition?.mass_spectrometry?.ion_mode ?? ''));
+    if (activeFilters.ms_type.length > 0)
+      result = result.filter((h) => activeFilters.ms_type.includes(h.record?.acquisition?.mass_spectrometry?.ms_type ?? ''));
+    return result;
+  }, [allHits, activeFilters]);
+
+  // sortedHits overrides filteredHits when the user sorts; reset when filteredHits changes
+  useEffect(() => {
+    setSortedHits(null);
+  }, [filteredHits]);
+
+  const displayedHits = sortedHits ?? filteredHits;
+
   const handleOnSubmit = useCallback(
     (formData: SearchFields) => {
-      const rippSelected = (formData?.propertyFilterOptions?.ripp_type ?? []) as string[];
-      const instrSelected = (formData?.propertyFilterOptions?.instrument_type ?? []) as string[];
-      const ionSelected = (formData?.propertyFilterOptions?.ion_mode ?? []) as string[];
-      const msSelected = (formData?.propertyFilterOptions?.ms_type ?? []) as string[];
-
-      let filtered = allHits;
-      if (rippSelected.length > 0)
-        filtered = filtered.filter((h) => rippSelected.includes(h.record?.compound?.classes?.[0] ?? ''));
-      if (instrSelected.length > 0)
-        filtered = filtered.filter((h) => instrSelected.includes(h.record?.acquisition?.instrument_type ?? ''));
-      if (ionSelected.length > 0)
-        filtered = filtered.filter((h) => ionSelected.includes(h.record?.acquisition?.mass_spectrometry?.ion_mode ?? ''));
-      if (msSelected.length > 0)
-        filtered = filtered.filter((h) => msSelected.includes(h.record?.acquisition?.mass_spectrometry?.ms_type ?? ''));
-
-      setHits(filtered);
+      setActiveFilters({
+        ripp_type: (formData?.propertyFilterOptions?.ripp_type ?? []) as string[],
+        instrument_type: (formData?.propertyFilterOptions?.instrument_type ?? []) as string[],
+        ion_mode: (formData?.propertyFilterOptions?.ion_mode ?? []) as string[],
+        ms_type: (formData?.propertyFilterOptions?.ms_type ?? []) as string[],
+      });
     },
-    [allHits],
+    [],
   );
 
   const searchPanelHeight = useMemo(() => height * 0.9, [height]);
@@ -98,9 +119,9 @@ function ContentView() {
 
   const handleOnSelectSort = useCallback(
     (sortValue: ResultTableSortOption) => {
-      setHits((prev) => (prev ? sortHits(prev, sortValue) : null));
+      setSortedHits(sortHits([...filteredHits], sortValue));
     },
-    [],
+    [filteredHits],
   );
 
   const handleOnResize = useCallback(
@@ -115,44 +136,27 @@ function ContentView() {
     [],
   );
 
-  const searchAndResultPanel = useMemo(() => {
-    const filterItems = PropertyFilterOptionsMenuItems({ propertyFilterOptions, showCounts: true });
+  const filterItems = useMemo(
+    () => PropertyFilterOptionsMenuItems({ propertyFilterOptions, showCounts: true }),
+    [propertyFilterOptions],
+  );
 
-    const searchPanel = (
-      <CommonSearchPanel
-        items={filterItems}
-        collapsed={isCollapsed}
-        onCollapse={handleOnCollapse}
-        propertyFilterOptions={propertyFilterOptions}
-        onSubmit={handleOnSubmit}
-        onValuesChange={handleOnSubmit}
-        width={searchPanelWidth}
-        height={searchPanelHeight}
-        initialValues={initialFilterValues}
-        disableActiveKeys={true}
-        hideSearchButton={true}
-      />
-    );
-
-    return (
-      <SearchAndResultPanel
-        searchPanel={searchPanel}
-        width={width}
-        height={searchPanelHeight}
-        searchPanelWidth={searchPanelWidth}
-        widthOverview={width}
-        heightOverview={height}
-        hits={hits}
-        isRequesting={false}
-        onSort={handleOnSelectSort}
-        onResize={handleOnResize}
-      />
-    );
-  }, [
-    propertyFilterOptions, isCollapsed, handleOnCollapse, handleOnSubmit,
-    searchPanelWidth, searchPanelHeight, width, height, hits,
-    handleOnSelectSort, handleOnResize, initialFilterValues,
-  ]);
+  const searchPanel = useMemo(() => (
+    <CommonSearchPanel
+      items={filterItems}
+      collapsed={isCollapsed}
+      onCollapse={handleOnCollapse}
+      propertyFilterOptions={propertyFilterOptions}
+      onSubmit={handleOnSubmit}
+      onValuesChange={handleOnSubmit}
+      width={searchPanelWidth}
+      height={searchPanelHeight}
+      initialValues={initialFilterValues}
+      disableActiveKeys={true}
+      hideSearchButton={true}
+    />
+  ), [filterItems, isCollapsed, handleOnCollapse, propertyFilterOptions, handleOnSubmit,
+      searchPanelWidth, searchPanelHeight, initialFilterValues]);
 
   return (
     <Layout
@@ -165,7 +169,18 @@ function ContentView() {
         <ErrorElement message={errorMessage} />
       ) : (
         <Content style={{ width: '100%', height: '100%', backgroundColor: 'white' }}>
-          {searchAndResultPanel}
+          <SearchAndResultPanel
+            searchPanel={searchPanel}
+            width={width}
+            height={searchPanelHeight}
+            searchPanelWidth={searchPanelWidth}
+            widthOverview={width}
+            heightOverview={height}
+            hits={displayedHits}
+            isRequesting={false}
+            onSort={handleOnSelectSort}
+            onResize={handleOnResize}
+          />
         </Content>
       )}
     </Layout>
