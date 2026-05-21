@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useContainerDimensions from '../../../../utils/useContainerDimensions';
 import Hit from '../../../../types/Hit';
 import ContentFilterOptions from '../../../../types/filterOptions/ContentFilterOtions';
-import { Layout } from 'antd';
+import { Layout, Spin } from 'antd';
 import { Content } from 'antd/es/layout/layout';
 import SearchFields from '../../../../types/filterOptions/SearchFields';
 import SearchAndResultPanel from '../../../common/SearchAndResultPanel';
@@ -16,7 +16,6 @@ import ErrorElement from '../../../basic/ErrorElement';
 import fetchData from '../../../../utils/request/fetchData';
 import initFlags from '../../../../utils/initFlags';
 import { usePropertiesContext } from '../../../../context/properties/properties';
-import buildSearchParamsFromFormData from '../../../../utils/buildSearchParamsFromFormData';
 import Record from '../../../../types/record/Record';
 import RequestResponse from '../../../../types/RequestResponse';
 
@@ -27,63 +26,68 @@ function ContentView() {
   const { width, height } = useContainerDimensions(ref);
   const { backendUrl } = usePropertiesContext();
 
-  const [isSearching, setIsSearching] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
+  const [allHits, setAllHits] = useState<Hit[]>([]);
   const [hits, setHits] = useState<Hit[] | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [propertyFilterOptions, setPropertyFilterOptions] =
     useState<ContentFilterOptions | null>(null);
   const [searchPanelWidth, setSearchPanelWidth] = useState<number>(defaultSearchPanelWidth);
 
-  const handleOnFetchContent = useCallback(
-    async () => {
-      const url = backendUrl + '/filter/browse';
-      const response = (await fetchData(url)) as RequestResponse<ContentFilterOptions>;
-      if (response.status === 'success' && response.data) {
-        initFlags(response.data);
-        setPropertyFilterOptions(response.data);
-      }
-    },
-    [backendUrl],
-  );
+  useEffect(() => {
+    async function loadData() {
+      setIsLoading(true);
 
-  const handleOnSearch = useCallback(
-    async (formData: SearchFields) => {
-      setIsSearching(true);
-      const builtSearchParams = buildSearchParamsFromFormData(formData);
-      const url = backendUrl + '/records';
-      const response = await fetchData(url, builtSearchParams);
-
-      if (response.status === 'error') {
-        setHits(null);
-        setErrorMessage('An error occurred while trying to fetch records.');
-      } else {
-        const records = (response.data as Record[] | null) ?? [];
-        const _hits: Hit[] = records.map((rec, i) => ({
-          index: i,
-          accession: rec.accession,
-          atomcount: 0,
-          record: rec,
-        }));
-        setHits(_hits);
-        setErrorMessage(null);
+      // Fetch filter options
+      const browseResponse = (await fetchData(backendUrl + '/filter/browse')) as RequestResponse<ContentFilterOptions>;
+      if (browseResponse.status === 'success' && browseResponse.data) {
+        initFlags(browseResponse.data);
+        setPropertyFilterOptions(browseResponse.data);
       }
-      setIsSearching(false);
-    },
-    [backendUrl],
-  );
+
+      // Fetch all records
+      const recordsResponse = await fetchData(backendUrl + '/records');
+      if (recordsResponse.status === 'error') {
+        setErrorMessage('Failed to load records.');
+        setIsLoading(false);
+        return;
+      }
+      const records = (recordsResponse.data as Record[] | null) ?? [];
+      const loaded: Hit[] = records.map((rec, i) => ({
+        index: i,
+        accession: rec.accession,
+        atomcount: 0,
+        record: rec,
+      }));
+      setAllHits(loaded);
+      setHits(loaded);
+      setIsLoading(false);
+    }
+    loadData();
+  }, [backendUrl]);
 
   const handleOnSubmit = useCallback(
-    async (formData: SearchFields) => {
-      await handleOnSearch(formData);
-    },
-    [handleOnSearch],
-  );
+    (formData: SearchFields) => {
+      const rippSelected = (formData?.propertyFilterOptions?.ripp_type ?? []) as string[];
+      const instrSelected = (formData?.propertyFilterOptions?.instrument_type ?? []) as string[];
+      const ionSelected = (formData?.propertyFilterOptions?.ion_mode ?? []) as string[];
+      const msSelected = (formData?.propertyFilterOptions?.ms_type ?? []) as string[];
 
-  useEffect(() => {
-    handleOnFetchContent();
-    handleOnSearch({} as SearchFields);
-  }, [handleOnFetchContent, handleOnSearch]);
+      let filtered = allHits;
+      if (rippSelected.length > 0)
+        filtered = filtered.filter((h) => rippSelected.includes(h.record?.compound?.classes?.[0] ?? ''));
+      if (instrSelected.length > 0)
+        filtered = filtered.filter((h) => instrSelected.includes(h.record?.acquisition?.instrument_type ?? ''));
+      if (ionSelected.length > 0)
+        filtered = filtered.filter((h) => ionSelected.includes(h.record?.acquisition?.mass_spectrometry?.ion_mode ?? ''));
+      if (msSelected.length > 0)
+        filtered = filtered.filter((h) => msSelected.includes(h.record?.acquisition?.mass_spectrometry?.ms_type ?? ''));
+
+      setHits(filtered);
+    },
+    [allHits],
+  );
 
   const searchPanelHeight = useMemo(() => height * 0.9, [height]);
 
@@ -94,10 +98,9 @@ function ContentView() {
 
   const handleOnSelectSort = useCallback(
     (sortValue: ResultTableSortOption) => {
-      const _hits = hits ? sortHits(hits, sortValue) : null;
-      setHits(_hits);
+      setHits((prev) => (prev ? sortHits(prev, sortValue) : null));
     },
-    [hits],
+    [],
   );
 
   const handleOnResize = useCallback(
@@ -140,14 +143,14 @@ function ContentView() {
         widthOverview={width}
         heightOverview={height}
         hits={hits}
-        isRequesting={isSearching}
+        isRequesting={false}
         onSort={handleOnSelectSort}
         onResize={handleOnResize}
       />
     );
   }, [
     propertyFilterOptions, isCollapsed, handleOnCollapse, handleOnSubmit,
-    searchPanelWidth, searchPanelHeight, width, height, hits, isSearching,
+    searchPanelWidth, searchPanelHeight, width, height, hits,
     handleOnSelectSort, handleOnResize, initialFilterValues,
   ]);
 
@@ -156,8 +159,10 @@ function ContentView() {
       ref={ref}
       style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', userSelect: 'none' }}
     >
-      {errorMessage && !hits ? (
-        <ErrorElement message={'An error occurred while trying to fetch the content.'} />
+      {isLoading ? (
+        <Spin size="large" />
+      ) : errorMessage ? (
+        <ErrorElement message={errorMessage} />
       ) : (
         <Content style={{ width: '100%', height: '100%', backgroundColor: 'white' }}>
           {searchAndResultPanel}
