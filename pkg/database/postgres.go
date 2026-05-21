@@ -1671,7 +1671,11 @@ func (p *PostgresSQLDB) AddRecord(record *massbank.MassBank2, metaDataId string,
 	// insert into contributor table
 	q = `INSERT INTO contributor (name) VALUES ($1) ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING id;`
 	var contributorId int
-	err = tx.QueryRow(q, *record.Contributor).Scan(&contributorId)
+	contributorName := ""
+	if record.Contributor != nil {
+		contributorName = *record.Contributor
+	}
+	err = tx.QueryRow(q, contributorName).Scan(&contributorId)
 	if err != nil {
 		if err2 := tx.Rollback(); err2 != nil {
 			return errors.New("Could not rollback after error: " + err2.Error() + "\n:" + err.Error())
@@ -1815,7 +1819,15 @@ func (p *PostgresSQLDB) AddRecord(record *massbank.MassBank2, metaDataId string,
 	// insert into acquisition table
 	q = `INSERT INTO acquisition_instrument (instrument, instrument_type) VALUES ($1, $2) ON CONFLICT (instrument, instrument_type) DO UPDATE SET instrument = EXCLUDED.instrument, instrument_type = EXCLUDED.instrument_type RETURNING id;`
 	var acquisitionInstrumentId int
-	err = tx.QueryRow(q, *record.Acquisition.Instrument, *record.Acquisition.InstrumentType).Scan(&acquisitionInstrumentId)
+	acquisitionInstrument := ""
+	if record.Acquisition.Instrument != nil {
+		acquisitionInstrument = *record.Acquisition.Instrument
+	}
+	acquisitionInstrumentType := ""
+	if record.Acquisition.InstrumentType != nil {
+		acquisitionInstrumentType = *record.Acquisition.InstrumentType
+	}
+	err = tx.QueryRow(q, acquisitionInstrument, acquisitionInstrumentType).Scan(&acquisitionInstrumentId)
 	if err != nil {
 		if err2 := tx.Rollback(); err2 != nil {
 			return errors.New("Could not rollback after error: " + err2.Error() + "\n:" + err.Error())
@@ -1897,7 +1909,15 @@ func (p *PostgresSQLDB) AddRecord(record *massbank.MassBank2, metaDataId string,
 	// insert into peak-related tables
 	q = `INSERT INTO spectrum (splash, num_peak, massbank_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING RETURNING id;`
 	var spectrumId int
-	err = tx.QueryRow(q, *record.Peak.Splash, *record.Peak.NumPeak, massbankId).Scan(&spectrumId)
+	spectrumSplash := ""
+	if record.Peak.Splash != nil {
+		spectrumSplash = *record.Peak.Splash
+	}
+	spectrumNumPeak := uint(0)
+	if record.Peak.NumPeak != nil {
+		spectrumNumPeak = *record.Peak.NumPeak
+	}
+	err = tx.QueryRow(q, spectrumSplash, spectrumNumPeak, massbankId).Scan(&spectrumId)
 	if err != nil {
 		if err2 := tx.Rollback(); err2 != nil {
 			return errors.New("Could not rollback after error: " + err2.Error() + "\n:" + err.Error())
@@ -1959,18 +1979,57 @@ func (p *PostgresSQLDB) AddRecord(record *massbank.MassBank2, metaDataId string,
 	q = `INSERT INTO browse_options (massbank_id, accession, contributor, instrument_type, ms_type, ion_mode, title, smiles, peak_ids_vec, mz_vec, intensity_vec, relative_intensity_vec, inchi, inchikey, splash, formula, mass, atomcount) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18);`
 	var msType string
 	var ionMode string
-	for _, subProp := range *record.Acquisition.MassSpectrometry {
-		if subProp.Subtag == "MS_TYPE" {
-			msType = subProp.Value
-		} else if subProp.Subtag == "ION_MODE" {
-			ionMode = subProp.Value
-		}
-		if msType != "" && ionMode != "" {
-			break
+	if record.Acquisition.MassSpectrometry != nil {
+		for _, subProp := range *record.Acquisition.MassSpectrometry {
+			if subProp.Subtag == "MS_TYPE" {
+				msType = subProp.Value
+			} else if subProp.Subtag == "ION_MODE" {
+				ionMode = subProp.Value
+			}
+			if msType != "" && ionMode != "" {
+				break
+			}
 		}
 	}
 
-	_, err = tx.Exec(q, massbankId, *record.Accession, *record.Contributor, *record.Acquisition.InstrumentType, msType, ionMode, *record.RecordTitle, *record.Compound.Smiles, pq.Array(insertedPeaks.Id), pq.Array(insertedPeaks.Mz), pq.Array(insertedPeaks.Intensity), pq.Array(insertedPeaks.Rel), *record.Compound.InChI, inchikey, *record.Peak.Splash, *record.Compound.Formula, *record.Compound.Mass, getAtomCount(*record.Compound.Formula))
+	browseAccession := ""
+	if record.Accession != nil {
+		browseAccession = *record.Accession
+	}
+	browseContributor := ""
+	if record.Contributor != nil {
+		browseContributor = *record.Contributor
+	}
+	browseInstrumentType := ""
+	if record.Acquisition.InstrumentType != nil {
+		browseInstrumentType = *record.Acquisition.InstrumentType
+	}
+	browseTitle := ""
+	if record.RecordTitle != nil {
+		browseTitle = *record.RecordTitle
+	}
+	browseSmiles := ""
+	if record.Compound.Smiles != nil {
+		browseSmiles = *record.Compound.Smiles
+	}
+	browseInchi := ""
+	if record.Compound.InChI != nil {
+		browseInchi = *record.Compound.InChI
+	}
+	browseSplash := ""
+	if record.Peak.Splash != nil {
+		browseSplash = *record.Peak.Splash
+	}
+	browseFormula := ""
+	if record.Compound.Formula != nil {
+		browseFormula = *record.Compound.Formula
+	}
+	browseMass := 0.0
+	if record.Compound.Mass != nil {
+		browseMass = *record.Compound.Mass
+	}
+
+	_, err = tx.Exec(q, massbankId, browseAccession, browseContributor, browseInstrumentType, msType, ionMode, browseTitle, browseSmiles, pq.Array(insertedPeaks.Id), pq.Array(insertedPeaks.Mz), pq.Array(insertedPeaks.Intensity), pq.Array(insertedPeaks.Rel), browseInchi, inchikey, browseSplash, browseFormula, browseMass, getAtomCount(browseFormula))
 	if err != nil {
 		fmt.Println("Error: ", err)
 		if err2 := tx.Rollback(); err2 != nil {
@@ -1979,7 +2038,11 @@ func (p *PostgresSQLDB) AddRecord(record *massbank.MassBank2, metaDataId string,
 		return err
 	}
 
-	if (msType == "MS2" || msType == "MS3" || msType == "MS4") && *record.Peak.NumPeak > 1 && record.MassSpectrometry.FocusedIon != nil {
+	browseNumPeak := uint(0)
+	if record.Peak.NumPeak != nil {
+		browseNumPeak = *record.Peak.NumPeak
+	}
+	if (msType == "MS2" || msType == "MS3" || msType == "MS4") && browseNumPeak > 1 && record.MassSpectrometry.FocusedIon != nil {
 		var precursorStr = ""
 		for _, subProp := range *record.MassSpectrometry.FocusedIon {
 			if subProp.Subtag == "PRECURSOR_M/Z" {
@@ -2020,9 +2083,13 @@ func (p *PostgresSQLDB) AddRecord(record *massbank.MassBank2, metaDataId string,
 		}
 	}
 
+	recordAccession := ""
+	if record.Accession != nil {
+		recordAccession = *record.Accession
+	}
 	if record.Compound.Smiles != nil && *record.Compound.Smiles != "" {
 		q = `INSERT INTO molecules (molecule, accession, atomcount) VALUES ($1, $2, $3);`
-		_, err = tx.Exec(q, *record.Compound.Smiles, *record.Accession, getAtomCount(*record.Compound.Formula))
+		_, err = tx.Exec(q, *record.Compound.Smiles, recordAccession, getAtomCount(compoundFormula))
 		if err != nil {
 			if err2 := tx.Rollback(); err2 != nil {
 				return errors.New("Could not rollback after error: " + err2.Error() + "\n:" + err.Error())
@@ -2033,7 +2100,7 @@ func (p *PostgresSQLDB) AddRecord(record *massbank.MassBank2, metaDataId string,
 
 	// insert into records table
 	q = `INSERT INTO records (massbank_id, accession, record_text) VALUES ($1, $2, $3);`
-	_, err = tx.Exec(q, massbankId, *record.Accession, mb3RecordJson)
+	_, err = tx.Exec(q, massbankId, recordAccession, mb3RecordJson)
 	if err != nil {
 		if err2 := tx.Rollback(); err2 != nil {
 			return errors.New("Could not rollback after error: " + err2.Error() + "\n:" + err.Error())
