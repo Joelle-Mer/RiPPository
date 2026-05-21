@@ -20,7 +20,6 @@ import { usePropertiesContext } from '../../../../context/properties/properties'
 import propertyFilterOptionsFormDataToContentMapper from '../../../../utils/propertyFilterOptionsFormDataToContentMapper';
 import buildSearchParamsFromFormData from '../../../../utils/buildSearchParamsFromFormData';
 import Record from '../../../../types/record/Record';
-import RequestResponse from '../../../../types/RequestResponse';
 
 const defaultSearchPanelWidth = 450;
 
@@ -75,13 +74,13 @@ function ContentView() {
       setIsSearching(true);
       const builtSearchParams = buildSearchParamsFromFormData(formData);
       const url = backendUrl + '/records';
-      const response = (await fetchData(url, builtSearchParams)) as RequestResponse<Record[]>;
+      const response = await fetchData(url, builtSearchParams);
 
       if (response.status === 'error') {
         setHits(null);
         setErrorMessage('An error occurred while trying to fetch records.');
       } else {
-        const records = response.data ?? [];
+        const records = (response.data as Record[] | null) ?? [];
         const _hits: Hit[] = records.map((rec, i) => ({
           index: i,
           accession: rec.accession,
