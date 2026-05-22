@@ -1,187 +1,75 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import useContainerDimensions from '../../../../utils/useContainerDimensions';
-import Hit from '../../../../types/Hit';
-import ContentFilterOptions from '../../../../types/filterOptions/ContentFilterOtions';
-import { Layout, Spin } from 'antd';
-import { Content } from 'antd/es/layout/layout';
-import SearchFields from '../../../../types/filterOptions/SearchFields';
-import SearchAndResultPanel from '../../../common/SearchAndResultPanel';
-import CommonSearchPanel from '../../../common/CommonSearchPanel';
-import PropertyFilterOptionsMenuItems from '../search/searchPanel/msSpecFilter/PropertyFilterOptionsMenuItems';
-import defaultSearchFieldValues from '../../../../constants/defaultSearchFieldValues';
-import ResultTableSortOption from '../../../../types/ResultTableSortOption';
-import sortHits from '../../../../utils/sortHits';
-import collapseButtonWidth from '../../../../constants/collapseButtonWidth';
-import ErrorElement from '../../../basic/ErrorElement';
-import fetchData from '../../../../utils/request/fetchData';
-import initFlags from '../../../../utils/initFlags';
+import { useEffect, useState } from 'react';
+import { Layout, Spin, Table } from 'antd';
 import { usePropertiesContext } from '../../../../context/properties/properties';
-import Record from '../../../../types/record/Record';
-import RequestResponse from '../../../../types/RequestResponse';
+import fetchData from '../../../../utils/request/fetchData';
+import { useNavigate } from 'react-router-dom';
+import routes from '../../../../constants/routes';
 
-const defaultSearchPanelWidth = 450;
-
-type ActiveFilters = {
-  ripp_type: string[];
-  instrument_type: string[];
-  ion_mode: string[];
-  ms_type: string[];
-};
-
-const emptyFilters: ActiveFilters = {
-  ripp_type: [],
-  instrument_type: [],
-  ion_mode: [],
-  ms_type: [],
+type ContentRecord = {
+  accession: string;
+  title: string;
+  compound?: { classes?: string[]; mass?: number };
 };
 
 function ContentView() {
-  const ref = useRef(null);
-  const { width, height } = useContainerDimensions(ref);
-  const { backendUrl } = usePropertiesContext();
-
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
-  const [allHits, setAllHits] = useState<Hit[]>([]);
-  const [sortedHits, setSortedHits] = useState<Hit[] | null>(null);
-  const [activeFilters, setActiveFilters] = useState<ActiveFilters>(emptyFilters);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [propertyFilterOptions, setPropertyFilterOptions] =
-    useState<ContentFilterOptions | null>(null);
-  const [searchPanelWidth, setSearchPanelWidth] = useState<number>(defaultSearchPanelWidth);
+  const { backendUrl, baseUrl } = usePropertiesContext();
+  const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(true);
+  const [records, setRecords] = useState<ContentRecord[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function loadData() {
-      const browseResponse = (await fetchData(backendUrl + '/filter/browse')) as RequestResponse<ContentFilterOptions>;
-      if (browseResponse.status === 'success' && browseResponse.data) {
-        initFlags(browseResponse.data);
-        setPropertyFilterOptions(browseResponse.data);
+    if (!backendUrl) return;
+    fetchData(backendUrl + '/records').then((response) => {
+      if (response.status === 'error') {
+        setError('Failed to load: ' + response.message);
+      } else {
+        const data = response.data;
+        if (Array.isArray(data)) {
+          setRecords(data as ContentRecord[]);
+        } else {
+          setError('Unexpected response format: ' + JSON.stringify(data)?.slice(0, 200));
+        }
       }
-
-      const recordsResponse = await fetchData(backendUrl + '/records');
-      if (recordsResponse.status === 'error') {
-        setErrorMessage('Failed to load records.');
-        setIsLoading(false);
-        return;
-      }
-      const records = (recordsResponse.data as Record[] | null) ?? [];
-      const loaded: Hit[] = records.map((rec, i) => ({
-        index: i,
-        accession: rec.accession,
-        atomcount: 0,
-        record: rec,
-      }));
-      setAllHits(loaded);
       setIsLoading(false);
-    }
-    loadData();
+    });
   }, [backendUrl]);
 
-  // Derive filtered hits from allHits + activeFilters — no setState, no loops
-  const filteredHits = useMemo<Hit[]>(() => {
-    let result = allHits;
-    if (activeFilters.ripp_type.length > 0)
-      result = result.filter((h) => activeFilters.ripp_type.includes(h.record?.compound?.classes?.[0] ?? ''));
-    if (activeFilters.instrument_type.length > 0)
-      result = result.filter((h) => activeFilters.instrument_type.includes(h.record?.acquisition?.instrument_type ?? ''));
-    if (activeFilters.ion_mode.length > 0)
-      result = result.filter((h) => activeFilters.ion_mode.includes(h.record?.acquisition?.mass_spectrometry?.ion_mode ?? ''));
-    if (activeFilters.ms_type.length > 0)
-      result = result.filter((h) => activeFilters.ms_type.includes(h.record?.acquisition?.mass_spectrometry?.ms_type ?? ''));
-    return result;
-  }, [allHits, activeFilters]);
-
-  // sortedHits overrides filteredHits when the user sorts; reset when filteredHits changes
-  useEffect(() => {
-    setSortedHits(null);
-  }, [filteredHits]);
-
-  const displayedHits = sortedHits ?? filteredHits;
-
-  const handleOnSubmit = useCallback(
-    (formData: SearchFields) => {
-      setActiveFilters({
-        ripp_type: (formData?.propertyFilterOptions?.ripp_type ?? []) as string[],
-        instrument_type: (formData?.propertyFilterOptions?.instrument_type ?? []) as string[],
-        ion_mode: (formData?.propertyFilterOptions?.ion_mode ?? []) as string[],
-        ms_type: (formData?.propertyFilterOptions?.ms_type ?? []) as string[],
-      });
+  const columns = [
+    { title: 'Accession', dataIndex: 'accession', key: 'accession' },
+    { title: 'Title', dataIndex: 'title', key: 'title' },
+    {
+      title: 'RiPP Type',
+      key: 'rippType',
+      render: (_: unknown, r: ContentRecord) => r.compound?.classes?.[0] ?? '—',
     },
-    [],
-  );
-
-  const searchPanelHeight = useMemo(() => height * 0.9, [height]);
-
-  const handleOnCollapse = useCallback((_collapsed: boolean) => {
-    setIsCollapsed(_collapsed);
-    setSearchPanelWidth(_collapsed ? collapseButtonWidth : defaultSearchPanelWidth);
-  }, []);
-
-  const handleOnSelectSort = useCallback(
-    (sortValue: ResultTableSortOption) => {
-      setSortedHits(sortHits([...filteredHits], sortValue));
+    {
+      title: 'Mass (Da)',
+      key: 'mass',
+      render: (_: unknown, r: ContentRecord) => {
+        const m = r.compound?.mass;
+        return m != null && m !== 0 ? m.toFixed(4) : '—';
+      },
     },
-    [filteredHits],
-  );
-
-  const handleOnResize = useCallback(
-    (_searchPanelWidth: number) => {
-      if (!isCollapsed) setSearchPanelWidth(_searchPanelWidth);
-    },
-    [isCollapsed],
-  );
-
-  const initialFilterValues = useMemo<SearchFields>(
-    () => ({ ...(JSON.parse(JSON.stringify(defaultSearchFieldValues)) as SearchFields) }),
-    [],
-  );
-
-  const filterItems = useMemo(
-    () => PropertyFilterOptionsMenuItems({ propertyFilterOptions, showCounts: true }),
-    [propertyFilterOptions],
-  );
-
-  const searchPanel = useMemo(() => (
-    <CommonSearchPanel
-      items={filterItems}
-      collapsed={isCollapsed}
-      onCollapse={handleOnCollapse}
-      propertyFilterOptions={propertyFilterOptions}
-      onSubmit={handleOnSubmit}
-      onValuesChange={handleOnSubmit}
-      width={searchPanelWidth}
-      height={searchPanelHeight}
-      initialValues={initialFilterValues}
-      disableActiveKeys={true}
-      hideSearchButton={true}
-    />
-  ), [filterItems, isCollapsed, handleOnCollapse, propertyFilterOptions, handleOnSubmit,
-      searchPanelWidth, searchPanelHeight, initialFilterValues]);
+  ];
 
   return (
-    <Layout
-      ref={ref}
-      style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', userSelect: 'none' }}
-    >
+    <Layout style={{ width: '100%', height: '100%', padding: 24 }}>
       {isLoading ? (
-        <Spin size="large" />
-      ) : errorMessage ? (
-        <ErrorElement message={errorMessage} />
+        <Spin size="large" style={{ margin: 'auto' }} />
+      ) : error ? (
+        <div style={{ color: 'red' }}>{error}</div>
       ) : (
-        <Content style={{ width: '100%', height: '100%', backgroundColor: 'white' }}>
-          <SearchAndResultPanel
-            searchPanel={searchPanel}
-            width={width}
-            height={searchPanelHeight}
-            searchPanelWidth={searchPanelWidth}
-            widthOverview={width}
-            heightOverview={height}
-            hits={displayedHits}
-            isRequesting={false}
-            onSort={handleOnSelectSort}
-            onResize={handleOnResize}
-          />
-        </Content>
+        <Table
+          dataSource={records.map((r, i) => ({ ...r, key: i }))}
+          columns={columns}
+          onRow={(r) => ({
+            style: { cursor: 'pointer' },
+            onClick: () =>
+              navigate(baseUrl + '/' + routes.accession.path + '?id=' + r.accession),
+          })}
+          pagination={false}
+        />
       )}
     </Layout>
   );

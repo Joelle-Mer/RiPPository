@@ -3,9 +3,35 @@ import './UserInterface.scss';
 import { Content } from 'antd/es/layout/layout';
 import Header from '../header/Header';
 import Footer from '../footer/Footer';
-import { JSX, useCallback, useEffect, useMemo, useState } from 'react';
+import { Component, JSX, useCallback, useEffect, useMemo, useState } from 'react';
 import { Layout } from 'antd';
 import Modal from 'antd/es/modal/Modal';
+
+class PageErrorBoundary extends Component<
+  { children: JSX.Element },
+  { error: string | null }
+> {
+  constructor(props: { children: JSX.Element }) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(err: unknown) {
+    const msg = err instanceof Error ? err.message + '\n' + err.stack : String(err);
+    return { error: msg };
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: 24, color: 'red', whiteSpace: 'pre-wrap', fontSize: 13 }}>
+          <strong>Page error (please report this):</strong>
+          <br />
+          {this.state.error}
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const headerHeight = 120;
 const footerHeight = 50;
@@ -57,7 +83,7 @@ function UserInterface({ body }: InputProps) {
             alignItems: 'center',
           }}
         >
-          {body}
+          <PageErrorBoundary>{body}</PageErrorBoundary>
         </Content>
         <Footer
           height={footerHeight}
