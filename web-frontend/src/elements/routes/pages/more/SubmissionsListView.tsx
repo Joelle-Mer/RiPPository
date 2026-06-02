@@ -4,19 +4,73 @@ import { Content } from 'antd/es/layout/layout';
 import { SUBMISSIONS_KEY, RiPPSubmission } from '../submit/SubmitView';
 import type { ColumnsType } from 'antd/es/table';
 
+const GH_TOKEN = import.meta.env.VITE_GITHUB_TOKEN as string | undefined;
+
+// Parse "https://github.com/{owner}/{repo}/pull/{number}" → { owner, repo, number }
+function parsePrUrl(url: string): { owner: string; repo: string; number: number } | null {
+  const m = url.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+  if (!m) return null;
+  return { owner: m[1], repo: m[2], number: parseInt(m[3], 10) };
+}
+
+async function fetchPrStatus(
+  prUrl: string,
+): Promise<'Approved' | 'Rejected' | 'Pending'> {
+  const parsed = parsePrUrl(prUrl);
+  if (!parsed) return 'Pending';
+  const { owner, repo, number } = parsed;
+  try {
+    const headers: HeadersInit = { Accept: 'application/vnd.github+json' };
+    if (GH_TOKEN) headers['Authorization'] = `token ${GH_TOKEN}`;
+    const res = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/pulls/${number}`,
+      { headers },
+    );
+    if (!res.ok) return 'Pending';
+    const data = await res.json();
+    if (data.merged) return 'Approved';
+    if (data.state === 'closed') return 'Rejected';
+    return 'Pending';
+  } catch {
+    return 'Pending';
+  }
+}
+
 function SubmissionsListView() {
   const [submissions, setSubmissions] = useState<RiPPSubmission[]>([]);
+  const [checking, setChecking] = useState(false);
 
   const load = useCallback(() => {
     const stored: RiPPSubmission[] = JSON.parse(
       localStorage.getItem(SUBMISSIONS_KEY) ?? '[]',
     );
     setSubmissions(stored);
+    return stored;
+  }, []);
+
+  const syncStatuses = useCallback(async (subs: RiPPSubmission[]) => {
+    const pending = subs.filter((s) => s.status === 'Pending' && s.prUrl);
+    if (pending.length === 0) return;
+    setChecking(true);
+    const updated = [...subs];
+    await Promise.all(
+      pending.map(async (sub) => {
+        const newStatus = await fetchPrStatus(sub.prUrl!);
+        if (newStatus !== sub.status) {
+          const idx = updated.findIndex((s) => s.accession === sub.accession);
+          if (idx >= 0) updated[idx] = { ...updated[idx], status: newStatus };
+        }
+      }),
+    );
+    localStorage.setItem(SUBMISSIONS_KEY, JSON.stringify(updated));
+    setSubmissions(updated);
+    setChecking(false);
   }, []);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    const subs = load();
+    syncStatuses(subs);
+  }, [load, syncStatuses]);
 
   const columns: ColumnsType<RiPPSubmission> = useMemo(
     () => [
@@ -81,16 +135,21 @@ function SubmissionsListView() {
           record becomes part of the database. Click <strong>View on GitHub</strong> to
           follow the review progress.
         </p>
-        <Button size="small" onClick={load} style={{ marginLeft: 16, flexShrink: 0 }}>
+        <Button
+          size="small"
+          loading={checking}
+          onClick={() => {
+            const subs = load();
+            syncStatuses(subs);
+          }}
+          style={{ marginLeft: 16, flexShrink: 0 }}
+        >
           Refresh
         </Button>
       </div>
 
       {submissions.length === 0 ? (
-        <Empty
-          description="No submissions yet"
-          style={{ marginTop: 60 }}
-        />
+        <Empty description="No submissions yet" style={{ marginTop: 60 }} />
       ) : (
         <Table
           dataSource={submissions}
