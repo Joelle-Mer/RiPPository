@@ -8,7 +8,7 @@ import { Content } from 'antd/es/layout/layout';
 import SearchFields from '../../../../types/filterOptions/SearchFields';
 import SearchAndResultPanel from '../../../common/SearchAndResultPanel';
 import CommonSearchPanel from '../../../common/CommonSearchPanel';
-import SearchPanelMenuItems from './SearchPanelMenuItems';
+import SearchPanelMenuItems from '../search/SearchPanelMenuItems';
 import defaultSearchFieldValues from '../../../../constants/defaultSearchFieldValues';
 import ResultTableSortOption from '../../../../types/ResultTableSortOption';
 import sortHits from '../../../../utils/sortHits';
