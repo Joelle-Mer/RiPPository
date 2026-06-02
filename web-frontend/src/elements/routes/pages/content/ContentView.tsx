@@ -73,13 +73,26 @@ function ContentView() {
         return;
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const loaded: Hit[] = (raw as any[]).map((rec, i) => ({
-        index: i,
-        accession: rec.accession as string,
-        atomcount: 0,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        record: rec as any,
-      }));
+      const loaded: Hit[] = (raw as any[]).map((rec, i) => {
+        // Normalize peak values: ChartElement requires peak.id as string/number.
+        // ResultPanel does the same transformation when fetching records individually.
+        if (rec.peak?.peak?.values) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          rec.peak.peak.values = rec.peak.peak.values.map((p: any, j: number) => ({
+            mz: p.mz,
+            intensity: p.intensity,
+            rel: p.rel ?? 0,
+            id: 'peak-' + (p.id ?? j),
+          }));
+        }
+        return {
+          index: i,
+          accession: rec.accession as string,
+          atomcount: 0,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          record: rec as any,
+        };
+      });
       setAllHits(loaded);
       setIsLoading(false);
     }
