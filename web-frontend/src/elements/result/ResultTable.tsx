@@ -148,10 +148,16 @@ function ResultTable({
   const dataSource: ResultTableDataType[] = useMemo(() => {
     const rows: ResultTableDataType[] = [];
     hits.forEach((hit) => {
-      const rippType =
-        (hit.record?.compound?.classes && hit.record.compound.classes.length > 0)
+      const fullClass =
+        hit.record?.compound?.classes && hit.record.compound.classes.length > 0
           ? hit.record.compound.classes[0]
-          : 'N/A';
+          : '';
+      const rippIdx = fullClass.split('; ').indexOf('RiPP');
+      const rippTypeParts = fullClass.split('; ');
+      const rippType =
+        rippIdx >= 0 && rippIdx + 1 < rippTypeParts.length
+          ? rippTypeParts[rippIdx + 1]
+          : fullClass || 'N/A';
       const bioactivityComment = hit.record?.comments?.find(
         (c) => c.subtag?.toUpperCase() === 'BIOACTIVITY',
       );

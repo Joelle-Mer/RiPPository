@@ -240,12 +240,12 @@ function SearchPanelMenuItems({
             16,
             <Input
               type="text"
-              placeholder="Rutin"
+              placeholder="Aerucyclamide A"
               allowClear
               onKeyDown={(e: KeyboardEvent<HTMLInputElement>) =>
                 insertPlaceholder(e, {
                   compoundSearchFilterOptions: {
-                    compoundName: 'Rutin',
+                    compoundName: 'Aerucyclamide A',
                   },
                 })
               }
@@ -274,12 +274,12 @@ function SearchPanelMenuItems({
             16,
             <Input
               type="text"
-              placeholder="Flavonoid glycosides"
+              placeholder="Cyanobactin"
               allowClear
               onKeyDown={(e: KeyboardEvent<HTMLInputElement>) =>
                 insertPlaceholder(e, {
                   compoundSearchFilterOptions: {
-                    compoundClass: 'Flavonoid glycosides',
+                    compoundClass: 'Cyanobactin',
                   },
                 })
               }
@@ -308,12 +308,12 @@ function SearchPanelMenuItems({
             16,
             <Input
               type="text"
-              placeholder="C27H30O16"
+              placeholder="C24H34N6O4S2"
               allowClear
               onKeyDown={(e: KeyboardEvent<HTMLInputElement>) =>
                 insertPlaceholder(e, {
                   compoundSearchFilterOptions: {
-                    formula: 'C27H30O16',
+                    formula: 'C24H34N6O4S2',
                   },
                 })
               }
@@ -341,13 +341,13 @@ function SearchPanelMenuItems({
             8,
             16,
             <InputNumber
-              placeholder="610.15338"
+              placeholder="534.2083"
               step={0.01}
               min={0}
               onKeyDown={(e: KeyboardEvent<HTMLInputElement>) =>
                 insertPlaceholder(e, {
                   compoundSearchFilterOptions: {
-                    exactMass: 610.15338,
+                    exactMass: 534.2083,
                   },
                 })
               }

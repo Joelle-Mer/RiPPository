@@ -287,11 +287,9 @@ func ConvertMb2RecordToMb3Record(record *massbank.MassBank2) (*MbRecord, error) 
 
 	// insert comments data
 	if record.Comments != nil {
-		comments := []massbank.SubtagProperty{}
 		for _, comment := range *record.Comments {
-			comments = append(comments, massbank.SubtagProperty(comment))
+			result.Comments = append(result.Comments, MbRecordCommentsInner(comment))
 		}
-		*record.Comments = comments
 	}
 
 	// insert mass spectrometry data
