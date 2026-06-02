@@ -67,12 +67,14 @@ type InputProps = {
     e: KeyboardEvent<HTMLElement>,
     values: SearchFields,
   ) => void;
+  showCounts?: boolean;
 };
 
 function SearchPanelMenuItems({
   propertyFilterOptions = defaultSearchFieldValues.propertyFilterOptions,
   initialStructure = '',
   insertPlaceholder = () => {},
+  showCounts = false,
 }: InputProps) {
   const buildFormItemWithTootip = (
     label: string | undefined,
@@ -620,7 +622,7 @@ function SearchPanelMenuItems({
       key: 'propertyFilterOptions',
       label: 'Property Filter',
       icon: <DatabaseOutlined />,
-      children: PropertyFilterOptionsMenuItems({ propertyFilterOptions }),
+      children: PropertyFilterOptionsMenuItems({ propertyFilterOptions, showCounts }),
     });
   }
 

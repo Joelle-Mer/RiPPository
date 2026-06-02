@@ -26,6 +26,13 @@ import ValueCount from '../../../../types/ValueCount';
 
 const defaultSearchPanelWidth = 450;
 
+// "Natural Product; RiPP; Cyanobactin; Macrocyclic" → "Cyanobactin"
+function extractRippSubclass(classStr: string): string {
+  const parts = classStr.split('; ');
+  const idx = parts.indexOf('RiPP');
+  return idx >= 0 && idx + 1 < parts.length ? parts[idx + 1] : classStr;
+}
+
 type ActiveFilters = {
   ripp_type: string[];
   instrument_type: string[];
@@ -113,7 +120,10 @@ function ContentView() {
       loaded.forEach((h) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const classes: string[] = (h.record as any)?.compound?.classes ?? [];
-        classes.forEach((c) => rippTypeCounts.set(c, (rippTypeCounts.get(c) ?? 0) + 1));
+        classes.forEach((c) => {
+          const sub = extractRippSubclass(c);
+          rippTypeCounts.set(sub, (rippTypeCounts.get(sub) ?? 0) + 1);
+        });
       });
       const rippTypeOptions: ValueCount[] = Array.from(rippTypeCounts.entries())
         .sort(([a], [b]) => a.localeCompare(b))
@@ -136,8 +146,8 @@ function ContentView() {
     const r = (h: Hit) => h.record as any;
     if (activeFilters.ripp_type.length > 0)
       result = result.filter((h) =>
-        activeFilters.ripp_type.some((t) =>
-          (r(h)?.compound?.classes ?? []).includes(t),
+        (r(h)?.compound?.classes ?? []).some((c: string) =>
+          activeFilters.ripp_type.includes(extractRippSubclass(c)),
         ),
       );
     if (activeFilters.instrument_type.length > 0)
@@ -266,6 +276,7 @@ function ContentView() {
       SearchPanelMenuItems({
         propertyFilterOptions,
         insertPlaceholder,
+        showCounts: true,
       }),
     [propertyFilterOptions, insertPlaceholder],
   );
