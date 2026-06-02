@@ -211,4 +211,8 @@ var commentSubtagList = []string{
 	"[Profile]",
 	"CONFIDENCE",
 	"INTERNAL_ID",
+	"BIOACTIVITY",
+	"PRECURSOR_SEQ",
+	"MiBIG",
+	"GenBank",
 }
