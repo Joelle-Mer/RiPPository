@@ -158,10 +158,19 @@ function ResultTable({
         rippIdx >= 0 && rippIdx + 1 < rippTypeParts.length
           ? rippTypeParts[rippIdx + 1]
           : fullClass || 'N/A';
+      // Handle two storage formats:
+      // 1. Correct: {subtag: "BIOACTIVITY", value: "Grazer; ..."}
+      // 2. Legacy:  {subtag: "", value: "BIOACTIVITY Grazer; ..."}
       const bioactivityComment = hit.record?.comments?.find(
-        (c) => c.subtag?.toUpperCase() === 'BIOACTIVITY',
+        (c) =>
+          c.subtag?.toUpperCase() === 'BIOACTIVITY' ||
+          c.value?.toUpperCase().startsWith('BIOACTIVITY '),
       );
-      const bioactivity = bioactivityComment?.value ?? 'N/A';
+      const bioactivity = bioactivityComment
+        ? bioactivityComment.subtag
+          ? bioactivityComment.value
+          : bioactivityComment.value.replace(/^BIOACTIVITY\s+/i, '')
+        : 'N/A';
       const row: ResultTableDataType = {
         key: 'result-table-row_' + hit.index + '_' + hit.score,
         accessionRaw: hit.accession,
