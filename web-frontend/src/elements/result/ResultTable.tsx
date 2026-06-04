@@ -166,11 +166,14 @@ function ResultTable({
           c.subtag?.toUpperCase() === 'BIOACTIVITY' ||
           c.value?.toUpperCase().startsWith('BIOACTIVITY '),
       );
-      const bioactivity = bioactivityComment
+      const bioactivityFull = bioactivityComment
         ? bioactivityComment.subtag
           ? bioactivityComment.value
           : bioactivityComment.value.replace(/^BIOACTIVITY\s+/i, '')
         : 'N/A';
+      const bioactivity = bioactivityFull === 'N/A'
+        ? 'N/A'
+        : bioactivityFull.split(';')[0].trim();
       const row: ResultTableDataType = {
         key: 'result-table-row_' + hit.index + '_' + hit.score,
         accessionRaw: hit.accession,
