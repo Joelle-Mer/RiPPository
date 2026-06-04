@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -428,7 +429,14 @@ func (p *PostgresSQLDB) GetVersion() (string, error) {
 
 func (p *PostgresSQLDB) GetRecords(s *[]string) (*[]string, error) {
 
-	var query = "SELECT record_text FROM records WHERE accession = ANY ($1);"
+	// Fetch stored JSON plus live comments from the massbank table.
+	// The massbank.comments column is authoritative; the stored JSON may be stale
+	// (imported before the comments conversion fix), so we overwrite it on read.
+	var query = `
+		SELECT r.accession, r.record_text, COALESCE(m.comments, '{}')
+		FROM records r
+		LEFT JOIN massbank m ON m.accession = r.accession
+		WHERE r.accession = ANY ($1);`
 	stmt, err := p.database.Prepare(query)
 	if err != nil {
 		return nil, err
@@ -441,14 +449,130 @@ func (p *PostgresSQLDB) GetRecords(s *[]string) (*[]string, error) {
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var record string
-		if err := rows.Scan(&record); err != nil {
+		var accession string
+		var recordText string
+		var dbComments []string
+		if err := rows.Scan(&accession, &recordText, pq.Array(&dbComments)); err != nil {
 			return nil, err
 		}
-		recordStrings = append(recordStrings, record)
+
+		// Build the comments JSON array from the massbank table
+		// Comments are stored as "subtag---value" strings
+		commentsJSON := "[]"
+		if len(dbComments) > 0 {
+			var parts []string
+			for _, c := range dbComments {
+				// Each element is stored as "subtag---value" (pq.Array strips outer quotes)
+				split := strings.SplitN(c, "---", 2)
+				if len(split) == 2 {
+					subtag := split[0]
+					value := split[1]
+					var entry string
+					if subtag != "" {
+						entry = fmt.Sprintf(`{"subtag":%s,"value":%s}`, jsonStr(subtag), jsonStr(value))
+					} else {
+						entry = fmt.Sprintf(`{"value":%s}`, jsonStr(value))
+					}
+					parts = append(parts, entry)
+				}
+			}
+			if len(parts) > 0 {
+				commentsJSON = "[" + strings.Join(parts, ",") + "]"
+			}
+		}
+
+		// Inject the live comments into the stored JSON
+		// Replace whatever was stored for "comments" with the live value
+		updated := injectJSONField(recordText, "comments", commentsJSON)
+		recordStrings = append(recordStrings, updated)
 	}
 
 	return &recordStrings, nil
+}
+
+// jsonStr escapes a string for JSON output
+func jsonStr(s string) string {
+	b, _ := json.Marshal(s)
+	return string(b)
+}
+
+// injectJSONField replaces or inserts a top-level JSON field in a JSON object string
+func injectJSONField(jsonObj, field, value string) string {
+	// Simple approach: strip trailing "}" and append/replace the field
+	trimmed := strings.TrimSpace(jsonObj)
+	if len(trimmed) < 2 {
+		return jsonObj
+	}
+	// Remove trailing "}"
+	body := strings.TrimSuffix(trimmed, "}")
+	fieldKey := `"` + field + `":`
+
+	if idx := strings.Index(body, fieldKey); idx >= 0 {
+		// Find the end of this field's value to replace it
+		// Walk from idx+len(fieldKey) to find balanced brackets or end-of-string
+		start := idx + len(fieldKey)
+		end := findJSONValueEnd(body, start)
+		return body[:idx] + fieldKey + value + body[end:] + "}"
+	}
+	// Field not present — append it
+	if strings.TrimSpace(body) == "{" {
+		return "{" + fieldKey + value + "}"
+	}
+	return body + "," + fieldKey + value + "}"
+}
+
+// findJSONValueEnd returns the index just after the JSON value starting at pos
+func findJSONValueEnd(s string, pos int) int {
+	if pos >= len(s) {
+		return pos
+	}
+	ch := s[pos]
+	if ch == '[' || ch == '{' {
+		depth := 0
+		inStr := false
+		for i := pos; i < len(s); i++ {
+			c := s[i]
+			if inStr {
+				if c == '\\' {
+					i++
+				} else if c == '"' {
+					inStr = false
+				}
+				continue
+			}
+			switch c {
+			case '"':
+				inStr = true
+			case '[', '{':
+				depth++
+			case ']', '}':
+				depth--
+				if depth == 0 {
+					return i + 1
+				}
+			}
+		}
+		return len(s)
+	}
+	if ch == '"' {
+		for i := pos + 1; i < len(s); i++ {
+			c := s[i]
+			if c == '\\' {
+				i++
+			} else if c == '"' {
+				return i + 1
+			}
+		}
+		return len(s)
+	}
+	// number, bool, null — scan to next comma, }, ]
+	for i := pos; i < len(s); i++ {
+		c := s[i]
+		if c == ',' || c == '}' || c == ']' {
+			return i
+		}
+	}
+	return len(s)
 }
 
 // GetRecord see [MB3Database.GetRecord]
