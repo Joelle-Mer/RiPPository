@@ -73,14 +73,14 @@ function ResizableTitle({ onResize, width, children, style, ...rest }: Resizable
 
 // ── Default column widths ────────────────────────────────────────────────────
 const DEFAULT_WIDTHS: Record<string, number> = {
-  score:      80,
-  accession:  130,
-  title:      200,
-  rippType:   140,
-  mass:       110,
-  bioactivity:140,
-  chart:      260,
-  structure:  260,
+  score:      70,
+  accession:  105,
+  title:      160,
+  rippType:   120,
+  mass:       90,
+  bioactivity:120,
+  chart:      200,
+  structure:  200,
 };
 
 // ── Main component ───────────────────────────────────────────────────────────

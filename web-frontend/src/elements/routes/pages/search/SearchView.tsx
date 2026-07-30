@@ -43,7 +43,7 @@ import generateID from '../../../../utils/generateID';
 import RequestResponse from '../../../../types/RequestResponse';
 import ErrorElement from '../../../basic/ErrorElement';
 
-const defaultSearchPanelWidth = 450;
+const defaultSearchPanelWidth = 340;
 
 function SearchView() {
   const ref = useRef(null);

@@ -77,10 +77,11 @@ function UserInterface({ body }: InputProps) {
         <Content
           style={{
             width: '100%',
-            height: `calc(100% - ${headerHeight} - ${footerHeight})`,
+            height: `calc(100vh - ${headerHeight + footerHeight}px)`,
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
+            overflow: 'hidden',
           }}
         >
           <PageErrorBoundary>{body}</PageErrorBoundary>

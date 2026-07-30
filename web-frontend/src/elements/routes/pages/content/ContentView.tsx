@@ -24,7 +24,7 @@ import parsePeakListInputField from '../../../../utils/parsePeakListAndReference
 import generateID from '../../../../utils/generateID';
 import ValueCount from '../../../../types/ValueCount';
 
-const defaultSearchPanelWidth = 450;
+const defaultSearchPanelWidth = 340;
 
 // "Natural Product; RiPP; Cyanobactin; Macrocyclic" → "Cyanobactin"
 function extractRippSubclass(classStr: string): string {
