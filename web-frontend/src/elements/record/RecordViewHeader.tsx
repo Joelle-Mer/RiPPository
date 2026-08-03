@@ -168,16 +168,18 @@ function RecordViewHeader({ record, width, imageWidth = 260 }: InputProps) {
           borderBottom: '2px solid #f0f0f0',
           gap: 12,
         }}>
-          <ExportableContent
-            component={
-              <span style={{ fontSize: 17, fontWeight: 700, color: '#111827', lineHeight: 1.4 }}>
-                {record.title}
-              </span>
-            }
-            mode="copy"
-            onClick={() => handleOnCopy('Title', record.title)}
-            title="Copy title to clipboard"
-          />
+          <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+            <ExportableContent
+              component={
+                <span style={{ fontSize: 17, fontWeight: 700, color: '#111827', lineHeight: 1.4 }}>
+                  {record.title}
+                </span>
+              }
+              mode="copy"
+              onClick={() => handleOnCopy('Title', record.title)}
+              title="Copy title to clipboard"
+            />
+          </div>
           <Dropdown menu={{ items: downloadMenuItems }} trigger={['click']}>
             <Button
               style={{ flexShrink: 0, minWidth: 100, color: 'black', borderColor: 'black' }}
