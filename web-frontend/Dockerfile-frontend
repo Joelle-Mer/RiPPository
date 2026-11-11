@@ -5,17 +5,11 @@ WORKDIR /app
 COPY package.json ./
 RUN npm run clean-install
 # Then copy in the actual sources we need and build
-COPY tsconfig.json tsconfig.node.json vite.config.ts vite-env.d.ts server.ts server-utils.ts index.html entrypoint.sh ./
+COPY tsconfig.json tsconfig.node.json vite.config.ts vite-env.d.ts server.ts server-utils.ts server-github.ts index.html entrypoint.sh ./
 COPY src/ ./src/
 COPY public/ ./public/
-ARG VITE_GITHUB_TOKEN
-ARG VITE_GITHUB_OWNER
-ARG VITE_GITHUB_DATA_REPO
-ARG VITE_GITHUB_BASE_BRANCH
-ENV VITE_GITHUB_TOKEN=${VITE_GITHUB_TOKEN}
-ENV VITE_GITHUB_OWNER=${VITE_GITHUB_OWNER}
-ENV VITE_GITHUB_DATA_REPO=${VITE_GITHUB_DATA_REPO}
-ENV VITE_GITHUB_BASE_BRANCH=${VITE_GITHUB_BASE_BRANCH}
+# Everything VITE_ is built into code that every visitor downloads, so no key may go here. The
+# GitHub key for submissions is GITHUB_TOKEN, read by the server at run time (compose environment).
 ARG VITE_FEEDBACK_EMAIL
 ENV VITE_FEEDBACK_EMAIL=${VITE_FEEDBACK_EMAIL}
 RUN npm run build
@@ -28,7 +22,7 @@ COPY --from=build /app/node_modules ./node_modules/
 COPY --from=build /app/dist ./dist/
 COPY --from=build /app/src ./src/
 COPY --from=build /app/public ./public/
-COPY --from=build /app/package.json /app/package-lock.json /app/server.ts /app/server-utils.ts /app/entrypoint.sh ./
+COPY --from=build /app/package.json /app/package-lock.json /app/server.ts /app/server-utils.ts /app/server-github.ts /app/entrypoint.sh ./
 COPY --from=build /app/mb_version.txt ./
 
 ENTRYPOINT sh entrypoint.sh "${MB3_API_URL}" "${MB3_FRONTEND_URL}" "${MB3_FRONTEND_BASE_URL}" "${EXPORT_SERVICE_URL}" "${MB3_API_URL_INTERNAL}" "${EXPORT_SERVICE_URL_INTERNAL}" "${DISTRIBUTOR_TEXT}" "${DISTRIBUTOR_URL}" "${MB3_FRONTEND_BROWSER_TAB_TITLE}" "${MB3_FRONTEND_HOMEPAGE_INTRO_TEXT}" "${MB3_FRONTEND_HOMEPAGE_NEWS_SECTION_TEXT}" "${MB3_FRONTEND_HOMEPAGE_FUNDING_SECTION_TEXT}" "${MB3_FRONTEND_HOMEPAGE_ADDITIONAL_SECTION_NAME}" "${MB3_FRONTEND_HOMEPAGE_ADDITIONAL_SECTION_TEXT}" "${HTML_HEAD_FILE}" "${HTML_BODY_FILE}"

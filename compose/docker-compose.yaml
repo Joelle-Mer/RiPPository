@@ -148,13 +148,14 @@ services:
       context: ../web-frontend
       dockerfile: Dockerfile-frontend
       args:
-        VITE_GITHUB_TOKEN: ${VITE_GITHUB_TOKEN}
-        VITE_GITHUB_OWNER: ${VITE_GITHUB_OWNER}
-        VITE_GITHUB_DATA_REPO: ${VITE_GITHUB_DATA_REPO}
-        VITE_GITHUB_BASE_BRANCH: ${VITE_GITHUB_BASE_BRANCH}
         VITE_FEEDBACK_EMAIL: ${VITE_FEEDBACK_EMAIL:-}
     restart: unless-stopped
     environment:
+      # read by the site's server at run time, never built into the pages
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITHUB_OWNER: ${GITHUB_OWNER:-Joelle-Mer}
+      GITHUB_DATA_REPO: ${GITHUB_DATA_REPO:-RiPPository-data}
+      GITHUB_BASE_BRANCH: ${GITHUB_BASE_BRANCH:-main}
       MB3_API_URL: "${MB3_API_URL}"
       MB3_API_URL_INTERNAL: "http://mb3server:8080${MB3_API_BASE_URL}"
       MB3_FRONTEND_URL: "http://${MB3_FRONTEND_HOST}:${MB3_FRONTEND_PORT}"
@@ -197,3 +198,4 @@ services:
       MB_DATA_DIRECTORY: "/RiPP-data"
     volumes:
       - "${MB_DATA_DIRECTORY}:/RiPP-data:ro"
+

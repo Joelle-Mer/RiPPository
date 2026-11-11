@@ -13,6 +13,13 @@ import {
   getLastmodDate,
 } from './server-utils.js';
 import RequestResponse from './src/types/RequestResponse.js';
+import {
+  checkSubmission,
+  githubConfig,
+  openSubmissionPr,
+  prStatus,
+  rateLimiter,
+} from './server-github.js';
 
 // Constants
 const port = 3000;
@@ -283,6 +290,67 @@ baseRouter.get(/\/(R|r)esult\.jsp/, (req: Request, res: Response) => {
     res.status(500).end(e.stack);
   }
 });
+
+// The Submit page's GitHub calls. The key stays here, in GITHUB_TOKEN, and never reaches a browser.
+const github = githubConfig(process.env);
+console.log(
+  'GitHub submissions:',
+  github ? `${github.owner}/${github.repo}` : 'off (no GITHUB_TOKEN)',
+);
+const submissionsAllowed = rateLimiter(10, 60 * 60 * 1000);
+baseRouter.post(
+  '/submit-api/submission',
+  express.json({ limit: '2mb' }),
+  async (req: Request, res: Response) => {
+    if (!github) {
+      res
+        .status(503)
+        .json({
+          error: 'Submissions to GitHub are not set up on this server.',
+        });
+      return;
+    }
+    const sub = checkSubmission(req.body);
+    if (typeof sub === 'string') {
+      res.status(400).json({ error: sub });
+      return;
+    }
+    if (!submissionsAllowed(req.ip ?? 'unknown')) {
+      res
+        .status(429)
+        .json({
+          error: 'Too many submissions from here; please try again in an hour.',
+        });
+      return;
+    }
+    try {
+      res.json({ prUrl: await openSubmissionPr(sub, github) });
+    } catch (e) {
+      console.error('GitHub submission failed:', e);
+      res
+        .status(502)
+        .json({
+          error:
+            e instanceof Error ? e.message : 'GitHub could not be reached.',
+        });
+    }
+  },
+);
+baseRouter.get(
+  '/submit-api/pr-status/:number',
+  async (req: Request, res: Response) => {
+    const number = Number(req.params.number);
+    if (!github || !Number.isInteger(number) || number < 1) {
+      res.json({ status: 'Pending' });
+      return;
+    }
+    try {
+      res.json({ status: await prStatus(number, github) });
+    } catch {
+      res.json({ status: 'Pending' });
+    }
+  },
+);
 
 // serve index.html for all other routes
 baseRouter.use(/(.*)/, async (req: Request, res: Response) => {

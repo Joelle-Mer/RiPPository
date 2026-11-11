@@ -3,8 +3,7 @@ import { Button, Empty, Table, Tag } from 'antd';
 import { Content } from 'antd/es/layout/layout';
 import { SUBMISSIONS_KEY, RiPPSubmission } from '../submit/SubmitView';
 import type { ColumnsType } from 'antd/es/table';
-
-const GH_TOKEN = import.meta.env.VITE_GITHUB_TOKEN as string | undefined;
+import { usePropertiesContext } from '../../../../context/properties/properties';
 
 // Parse "https://github.com/{owner}/{repo}/pull/{number}" → { owner, repo, number }
 function parsePrUrl(url: string): { owner: string; repo: string; number: number } | null {
@@ -13,30 +12,27 @@ function parsePrUrl(url: string): { owner: string; repo: string; number: number 
   return { owner: m[1], repo: m[2], number: parseInt(m[3], 10) };
 }
 
+// the site's own server asks GitHub, for pull requests in its data repository only
 async function fetchPrStatus(
   prUrl: string,
+  baseUrl: string,
 ): Promise<'Approved' | 'Rejected' | 'Pending'> {
   const parsed = parsePrUrl(prUrl);
   if (!parsed) return 'Pending';
-  const { owner, repo, number } = parsed;
   try {
-    const headers: HeadersInit = { Accept: 'application/vnd.github+json' };
-    if (GH_TOKEN) headers['Authorization'] = `token ${GH_TOKEN}`;
-    const res = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}/pulls/${number}`,
-      { headers },
-    );
+    const res = await fetch(`${baseUrl}/submit-api/pr-status/${parsed.number}`);
     if (!res.ok) return 'Pending';
     const data = await res.json();
-    if (data.merged) return 'Approved';
-    if (data.state === 'closed') return 'Rejected';
-    return 'Pending';
+    return data.status === 'Approved' || data.status === 'Rejected'
+      ? data.status
+      : 'Pending';
   } catch {
     return 'Pending';
   }
 }
 
 function SubmissionsListView() {
+  const { baseUrl } = usePropertiesContext();
   const [submissions, setSubmissions] = useState<RiPPSubmission[]>([]);
   const [checking, setChecking] = useState(false);
 
@@ -55,7 +51,7 @@ function SubmissionsListView() {
     const updated = [...subs];
     await Promise.all(
       pending.map(async (sub) => {
-        const newStatus = await fetchPrStatus(sub.prUrl!);
+        const newStatus = await fetchPrStatus(sub.prUrl!, baseUrl);
         if (newStatus !== sub.status) {
           const idx = updated.findIndex((s) => s.accession === sub.accession);
           if (idx >= 0) updated[idx] = { ...updated[idx], status: newStatus };
@@ -65,7 +61,7 @@ function SubmissionsListView() {
     localStorage.setItem(SUBMISSIONS_KEY, JSON.stringify(updated));
     setSubmissions(updated);
     setChecking(false);
-  }, []);
+  }, [baseUrl]);
 
   useEffect(() => {
     const subs = load();

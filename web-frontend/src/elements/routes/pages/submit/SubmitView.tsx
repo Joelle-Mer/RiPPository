@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Card, Col, Collapse, Divider, Form, Input, Modal, Radio, Row, Select, message } from 'antd';
 import { Content } from 'antd/es/layout/layout';
+import { usePropertiesContext } from '../../../../context/properties/properties';
 import { calculateExactMass, calculateSplash, parsePeakList } from '../../../../utils/chemistry';
 import { Molecule, SmilesParser } from 'openchemlib';
 import { MolfileSvgRenderer } from 'react-ocl';
@@ -138,73 +139,26 @@ function formatMassBankRecord(sub: RiPPSubmission): string {
 }
 
 // ── GitHub PR creator ────────────────────────────────────────────────────────
-const GH_TOKEN = import.meta.env.VITE_GITHUB_TOKEN as string | undefined;
-const GH_OWNER = (import.meta.env.VITE_GITHUB_OWNER as string | undefined) ?? 'Joelle-Mer';
-const GH_REPO = (import.meta.env.VITE_GITHUB_DATA_REPO as string | undefined) ?? 'RiPPository-data';
-const GH_BASE = (import.meta.env.VITE_GITHUB_BASE_BRANCH as string | undefined) ?? 'main';
-
-async function createGitHubPR(sub: RiPPSubmission, recordContent: string): Promise<string> {
-  if (!GH_TOKEN) throw new Error('GitHub token not configured (VITE_GITHUB_TOKEN).');
-  const headers: Record<string, string> = {
-    Authorization: `token ${GH_TOKEN}`,
-    Accept: 'application/vnd.github.v3+json',
-    'Content-Type': 'application/json',
-  };
-  const apiBase = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}`;
-
-  // 1. Get SHA of base branch
-  const refRes = await fetch(`${apiBase}/git/ref/heads/${GH_BASE}`, { headers });
-  if (!refRes.ok) throw new Error(`Could not get branch ref: ${await refRes.text()}`);
-  const baseSha: string = (await refRes.json()).object.sha;
-
-  // 2. Create submission branch
-  const branchName = `submission/${sub.accession.toLowerCase()}`;
-  const branchRes = await fetch(`${apiBase}/git/refs`, {
-    method: 'POST', headers,
-    body: JSON.stringify({ ref: `refs/heads/${branchName}`, sha: baseSha }),
-  });
-  if (!branchRes.ok) throw new Error(`Could not create branch: ${await branchRes.text()}`);
-
-  // 3. Add record file (Base64-encode UTF-8 content)
-  const encoded = btoa(unescape(encodeURIComponent(recordContent)));
-  const filePath = `RiPP-data/${sub.accession}.txt`;
-  const fileRes = await fetch(`${apiBase}/contents/${filePath}`, {
-    method: 'PUT', headers,
+// The site's own server opens the pull request (server-github.ts), so no GitHub key is in this code.
+async function createGitHubPR(sub: RiPPSubmission, recordContent: string, baseUrl: string): Promise<string> {
+  const res = await fetch(`${baseUrl}/submit-api/submission`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      message: `submission: ${sub.compoundName} (${sub.accession})`,
-      content: encoded,
-      branch: branchName,
+      accession: sub.accession,
+      compoundName: sub.compoundName,
+      compoundClass: sub.compoundClass,
+      compoundSubClass: sub.compoundSubClass,
+      formula: sub.formula,
+      submittedAt: sub.submittedAt,
+      record: recordContent,
     }),
   });
-  if (!fileRes.ok) throw new Error(`Could not create file: ${await fileRes.text()}`);
-
-  // 4. Open pull request
-  const submittedDate = new Date(sub.submittedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-  const prBody = [
-    `## New RiPP Submission`,
-    ``,
-    `| Field | Value |`,
-    `|-------|-------|`,
-    `| **Accession** | \`${sub.accession}\` |`,
-    `| **Compound** | ${sub.compoundName} |`,
-    `| **Class** | ${sub.compoundClass}${sub.compoundSubClass ? ' / ' + sub.compoundSubClass : ''} |`,
-    `| **Formula** | ${sub.formula} |`,
-    `| **Submitted** | ${submittedDate} |`,
-    ``,
-    `*Submitted via the RiPPository web form.*`,
-  ].join('\n');
-
-  const prRes = await fetch(`${apiBase}/pulls`, {
-    method: 'POST', headers,
-    body: JSON.stringify({
-      title: `[Submission] ${sub.compoundName} (${sub.accession})`,
-      body: prBody,
-      head: branchName,
-      base: GH_BASE,
-    }),
-  });
-  if (!prRes.ok) throw new Error(`Could not create PR: ${await prRes.text()}`);
-  return (await prRes.json()).html_url as string;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || typeof data.prUrl !== 'string') {
+    throw new Error(data.error ?? `The server answered ${res.status}.`);
+  }
+  return data.prUrl;
 }
 
 const RIPP_CLASSES = [
@@ -905,6 +859,7 @@ function SpectrumCard({
 }
 
 function SubmitView() {
+  const { baseUrl } = usePropertiesContext();
   const [form] = Form.useForm();
   const [messageApi, ctx] = message.useMessage();
   const [structureValue, setStructureValue] = useState('');
@@ -1219,7 +1174,7 @@ function SubmitView() {
       const recordTxt = formatMassBankRecord(sub);
       let prUrl: string | undefined;
       try {
-        prUrl = await createGitHubPR(sub, recordTxt);
+        prUrl = await createGitHubPR(sub, recordTxt, baseUrl);
         sub.prUrl = prUrl;
       } catch (ghErr) {
         console.error('GitHub PR creation failed:', ghErr);
