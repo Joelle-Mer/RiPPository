@@ -5,6 +5,14 @@ export default () => {
   return defineConfig({
     base: '',
     plugins: [react()],
+    server: {
+      proxy: {
+        '/annotate-api': {
+          target: 'http://127.0.0.1:8090',
+          rewrite: (path) => path.replace(/^\/annotate-api/, ''),
+        },
+      },
+    },
     ssr: {
       noExternal: [
         'antd',

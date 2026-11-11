@@ -1,5 +1,6 @@
 import RouteType from '../types/RouteType';
 import AboutView from '../elements/routes/pages/about/AboutView';
+import AnnotateView from '../elements/routes/pages/annotate/AnnotateView';
 import AccessionView from '../elements/routes/pages/accession/AccessionView';
 import ContentView from '../elements/routes/pages/content/ContentView';
 import HomeView from '../elements/routes/pages/home/HomeView';
@@ -22,6 +23,12 @@ const routes: Record<string, RouteType> = {
     label: 'Content',
     id: 'content',
     path: 'content',
+  },
+  annotate: {
+    component: AnnotateView,
+    label: 'Annotate',
+    id: 'annotate',
+    path: 'annotate',
   },
   submit: {
     component: SubmitLandingView,

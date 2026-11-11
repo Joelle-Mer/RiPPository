@@ -1,0 +1,2120 @@
+{
+ "classes": [
+  {
+   "alphabet_size": 19,
+   "kind": "class",
+   "label": "Standard 19 amino acids",
+   "modifications": [],
+   "name": "standard",
+   "topology": null
+  },
+  {
+   "alphabet_size": 25,
+   "kind": "class",
+   "label": "Cyanobactin",
+   "modifications": [
+    {
+     "applies_to": [
+      "Ser",
+      "Thr",
+      "Cys"
+     ],
+     "delta": -18.01056,
+     "n_on_by_default": 2,
+     "name": "azoline",
+     "residues": [
+      {
+       "applies_to": "Ser",
+       "label": "Ser[azoline]",
+       "mass": 69.02147,
+       "modification": "azoline",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Thr",
+       "label": "Thr[azoline]",
+       "mass": 83.03712,
+       "modification": "azoline",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Cys",
+       "label": "Cys[azoline]",
+       "mass": 84.99863,
+       "modification": "azoline",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": null,
+       "label": "Pro-MOxn",
+       "mass": 180.08988,
+       "modification": "azoline",
+       "observed": true,
+       "on_by_default": true
+      },
+      {
+       "applies_to": null,
+       "label": "Leu/Ile-Thn",
+       "mass": 198.08269,
+       "modification": "azoline",
+       "observed": true,
+       "on_by_default": true
+      }
+     ]
+    },
+    {
+     "applies_to": [
+      "Ser",
+      "Thr",
+      "Cys"
+     ],
+     "delta": -20.02621,
+     "n_on_by_default": 1,
+     "name": "azole",
+     "residues": [
+      {
+       "applies_to": "Ser",
+       "label": "Ser[azole]",
+       "mass": 67.00582,
+       "modification": "azole",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Thr",
+       "label": "Thr[azole]",
+       "mass": 81.02147,
+       "modification": "azole",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Cys",
+       "label": "Cys[azole]",
+       "mass": 82.98298,
+       "modification": "azole",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": null,
+       "label": "Phe-Oxa",
+       "mass": 214.07423,
+       "modification": "azole",
+       "observed": true,
+       "on_by_default": true
+      }
+     ]
+    },
+    {
+     "applies_to": [
+      "Ser",
+      "Thr",
+      "Tyr",
+      "Trp"
+     ],
+     "delta": 68.0626,
+     "n_on_by_default": 1,
+     "name": "prenyl",
+     "residues": [
+      {
+       "applies_to": null,
+       "label": "dma-Ser",
+       "mass": 155.094,
+       "modification": "prenyl",
+       "observed": true,
+       "on_by_default": true
+      },
+      {
+       "applies_to": "Ser",
+       "label": "Ser[prenyl]",
+       "mass": 155.09463,
+       "modification": "prenyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Thr",
+       "label": "Thr[prenyl]",
+       "mass": 169.11028,
+       "modification": "prenyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Tyr",
+       "label": "Tyr[prenyl]",
+       "mass": 231.12593,
+       "modification": "prenyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Trp",
+       "label": "Trp[prenyl]",
+       "mass": 254.14191,
+       "modification": "prenyl",
+       "observed": false,
+       "on_by_default": false
+      }
+     ]
+    },
+    {
+     "applies_to": "any",
+     "delta": 14.0157,
+     "n_on_by_default": 0,
+     "name": "N-methyl",
+     "residues": [
+      {
+       "applies_to": "Gly",
+       "label": "Gly[N-methyl]",
+       "mass": 71.03716,
+       "modification": "N-methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Ala",
+       "label": "Ala[N-methyl]",
+       "mass": 85.05281,
+       "modification": "N-methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Ser",
+       "label": "Ser[N-methyl]",
+       "mass": 101.04773,
+       "modification": "N-methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Pro",
+       "label": "Pro[N-methyl]",
+       "mass": 111.06846,
+       "modification": "N-methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Val",
+       "label": "Val[N-methyl]",
+       "mass": 113.08411,
+       "modification": "N-methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Thr",
+       "label": "Thr[N-methyl]",
+       "mass": 115.06338,
+       "modification": "N-methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Cys",
+       "label": "Cys[N-methyl]",
+       "mass": 117.02489,
+       "modification": "N-methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Leu/Ile",
+       "label": "Leu/Ile[N-methyl]",
+       "mass": 127.09976,
+       "modification": "N-methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Asn",
+       "label": "Asn[N-methyl]",
+       "mass": 128.05863,
+       "modification": "N-methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Asp",
+       "label": "Asp[N-methyl]",
+       "mass": 129.04264,
+       "modification": "N-methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Gln",
+       "label": "Gln[N-methyl]",
+       "mass": 142.07428,
+       "modification": "N-methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Lys",
+       "label": "Lys[N-methyl]",
+       "mass": 142.11066,
+       "modification": "N-methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Glu",
+       "label": "Glu[N-methyl]",
+       "mass": 143.05829,
+       "modification": "N-methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Met",
+       "label": "Met[N-methyl]",
+       "mass": 145.05619,
+       "modification": "N-methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "His",
+       "label": "His[N-methyl]",
+       "mass": 151.07461,
+       "modification": "N-methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Phe",
+       "label": "Phe[N-methyl]",
+       "mass": 161.08411,
+       "modification": "N-methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Arg",
+       "label": "Arg[N-methyl]",
+       "mass": 170.11681,
+       "modification": "N-methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Tyr",
+       "label": "Tyr[N-methyl]",
+       "mass": 177.07903,
+       "modification": "N-methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Trp",
+       "label": "Trp[N-methyl]",
+       "mass": 200.09501,
+       "modification": "N-methyl",
+       "observed": false,
+       "on_by_default": false
+      }
+     ]
+    },
+    {
+     "applies_to": [
+      "Ser",
+      "Thr",
+      "Tyr"
+     ],
+     "delta": 79.96633,
+     "n_on_by_default": 2,
+     "name": "phospho",
+     "residues": [
+      {
+       "applies_to": "Ser",
+       "label": "Ser[phospho]",
+       "mass": 166.99836,
+       "modification": "phospho",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Thr",
+       "label": "Thr[phospho]",
+       "mass": 181.01401,
+       "modification": "phospho",
+       "observed": true,
+       "on_by_default": true
+      },
+      {
+       "applies_to": "Tyr",
+       "label": "Tyr[phospho]",
+       "mass": 243.02966,
+       "modification": "phospho",
+       "observed": true,
+       "on_by_default": true
+      }
+     ]
+    }
+   ],
+   "name": "cyanobactin",
+   "topology": "head_to_tail"
+  },
+  {
+   "alphabet_size": 21,
+   "kind": "group",
+   "label": "Dehydration",
+   "modifications": [
+    {
+     "applies_to": [
+      "Ser",
+      "Thr"
+     ],
+     "delta": -18.01056,
+     "n_on_by_default": 2,
+     "name": "dehydration",
+     "residues": [
+      {
+       "applies_to": null,
+       "label": "Dha",
+       "mass": 69.02146,
+       "modification": "dehydration",
+       "observed": true,
+       "on_by_default": true
+      },
+      {
+       "applies_to": "Ser",
+       "label": "Ser[dehydration]",
+       "mass": 69.02147,
+       "modification": "dehydration",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": null,
+       "label": "Dhb",
+       "mass": 83.03711,
+       "modification": "dehydration",
+       "observed": true,
+       "on_by_default": true
+      },
+      {
+       "applies_to": "Thr",
+       "label": "Thr[dehydration]",
+       "mass": 83.03712,
+       "modification": "dehydration",
+       "observed": false,
+       "on_by_default": false
+      }
+     ]
+    }
+   ],
+   "name": "group_dehydration",
+   "topology": null
+  },
+  {
+   "alphabet_size": 25,
+   "kind": "group",
+   "label": "Heterocycle (azoline / azole)",
+   "modifications": [
+    {
+     "applies_to": [
+      "Ser",
+      "Thr",
+      "Cys"
+     ],
+     "delta": -18.01056,
+     "n_on_by_default": 3,
+     "name": "azoline",
+     "residues": [
+      {
+       "applies_to": "Ser",
+       "label": "Ser[azoline]",
+       "mass": 69.02147,
+       "modification": "azoline",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Thr",
+       "label": "Thr[azoline]",
+       "mass": 83.03712,
+       "modification": "azoline",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Cys",
+       "label": "Cys[azoline]",
+       "mass": 84.99863,
+       "modification": "azoline",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": null,
+       "label": "Thn",
+       "mass": 103.00918,
+       "modification": "azoline",
+       "observed": true,
+       "on_by_default": true
+      },
+      {
+       "applies_to": null,
+       "label": "Pro-MOxn",
+       "mass": 180.08988,
+       "modification": "azoline",
+       "observed": true,
+       "on_by_default": true
+      },
+      {
+       "applies_to": null,
+       "label": "Leu/Ile-Thn",
+       "mass": 198.08269,
+       "modification": "azoline",
+       "observed": true,
+       "on_by_default": true
+      }
+     ]
+    },
+    {
+     "applies_to": [
+      "Ser",
+      "Thr",
+      "Cys"
+     ],
+     "delta": -20.02621,
+     "n_on_by_default": 3,
+     "name": "azole",
+     "residues": [
+      {
+       "applies_to": "Ser",
+       "label": "Ser[azole]",
+       "mass": 67.00582,
+       "modification": "azole",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Thr",
+       "label": "Thr[azole]",
+       "mass": 81.02147,
+       "modification": "azole",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Cys",
+       "label": "Cys[azole]",
+       "mass": 82.98298,
+       "modification": "azole",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": null,
+       "label": "Gly-MOxa",
+       "mass": 138.04293,
+       "modification": "azole",
+       "observed": true,
+       "on_by_default": true
+      },
+      {
+       "applies_to": null,
+       "label": "Ala-Thz",
+       "mass": 154.02009,
+       "modification": "azole",
+       "observed": true,
+       "on_by_default": true
+      },
+      {
+       "applies_to": null,
+       "label": "Phe-Oxa",
+       "mass": 214.07423,
+       "modification": "azole",
+       "observed": true,
+       "on_by_default": true
+      }
+     ]
+    }
+   ],
+   "name": "group_heterocycle",
+   "topology": null
+  },
+  {
+   "alphabet_size": 19,
+   "kind": "group",
+   "label": "Hydration",
+   "modifications": [
+    {
+     "applies_to": [
+      "Ser",
+      "Thr",
+      "Asp",
+      "Glu"
+     ],
+     "delta": 18.01056,
+     "n_on_by_default": 0,
+     "name": "hydration",
+     "residues": [
+      {
+       "applies_to": "Ser",
+       "label": "Ser[hydration]",
+       "mass": 105.04259,
+       "modification": "hydration",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Thr",
+       "label": "Thr[hydration]",
+       "mass": 119.05824,
+       "modification": "hydration",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Asp",
+       "label": "Asp[hydration]",
+       "mass": 133.0375,
+       "modification": "hydration",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Glu",
+       "label": "Glu[hydration]",
+       "mass": 147.05315,
+       "modification": "hydration",
+       "observed": false,
+       "on_by_default": false
+      }
+     ]
+    }
+   ],
+   "name": "group_hydration",
+   "topology": null
+  },
+  {
+   "alphabet_size": 19,
+   "kind": "group",
+   "label": "Methylation",
+   "modifications": [
+    {
+     "applies_to": "any",
+     "delta": 14.01565,
+     "n_on_by_default": 0,
+     "name": "methyl",
+     "residues": [
+      {
+       "applies_to": "Gly",
+       "label": "Gly[methyl]",
+       "mass": 71.03711,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Ala",
+       "label": "Ala[methyl]",
+       "mass": 85.05276,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Ser",
+       "label": "Ser[methyl]",
+       "mass": 101.04768,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Pro",
+       "label": "Pro[methyl]",
+       "mass": 111.06841,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Val",
+       "label": "Val[methyl]",
+       "mass": 113.08406,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Thr",
+       "label": "Thr[methyl]",
+       "mass": 115.06333,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Cys",
+       "label": "Cys[methyl]",
+       "mass": 117.02484,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Leu/Ile",
+       "label": "Leu/Ile[methyl]",
+       "mass": 127.09971,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Asn",
+       "label": "Asn[methyl]",
+       "mass": 128.05858,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Asp",
+       "label": "Asp[methyl]",
+       "mass": 129.04259,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Gln",
+       "label": "Gln[methyl]",
+       "mass": 142.07423,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Lys",
+       "label": "Lys[methyl]",
+       "mass": 142.11061,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Glu",
+       "label": "Glu[methyl]",
+       "mass": 143.05824,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Met",
+       "label": "Met[methyl]",
+       "mass": 145.05614,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "His",
+       "label": "His[methyl]",
+       "mass": 151.07456,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Phe",
+       "label": "Phe[methyl]",
+       "mass": 161.08406,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Arg",
+       "label": "Arg[methyl]",
+       "mass": 170.11676,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Tyr",
+       "label": "Tyr[methyl]",
+       "mass": 177.07898,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Trp",
+       "label": "Trp[methyl]",
+       "mass": 200.09496,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      }
+     ]
+    }
+   ],
+   "name": "group_methylation",
+   "topology": null
+  },
+  {
+   "alphabet_size": 19,
+   "kind": "group",
+   "label": "Oxidation / hydroxylation",
+   "modifications": [
+    {
+     "applies_to": [
+      "Pro",
+      "Leu/Ile",
+      "Val",
+      "Phe",
+      "Tyr",
+      "Trp",
+      "Lys",
+      "Arg"
+     ],
+     "delta": 15.99491,
+     "n_on_by_default": 0,
+     "name": "hydroxyl",
+     "residues": [
+      {
+       "applies_to": "Pro",
+       "label": "Pro[hydroxyl]",
+       "mass": 113.04767,
+       "modification": "hydroxyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Val",
+       "label": "Val[hydroxyl]",
+       "mass": 115.06332,
+       "modification": "hydroxyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Leu/Ile",
+       "label": "Leu/Ile[hydroxyl]",
+       "mass": 129.07897,
+       "modification": "hydroxyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Lys",
+       "label": "Lys[hydroxyl]",
+       "mass": 144.08987,
+       "modification": "hydroxyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Phe",
+       "label": "Phe[hydroxyl]",
+       "mass": 163.06332,
+       "modification": "hydroxyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Arg",
+       "label": "Arg[hydroxyl]",
+       "mass": 172.09602,
+       "modification": "hydroxyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Tyr",
+       "label": "Tyr[hydroxyl]",
+       "mass": 179.05824,
+       "modification": "hydroxyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Trp",
+       "label": "Trp[hydroxyl]",
+       "mass": 202.07422,
+       "modification": "hydroxyl",
+       "observed": false,
+       "on_by_default": false
+      }
+     ]
+    },
+    {
+     "applies_to": "any",
+     "delta": -2.01565,
+     "n_on_by_default": 0,
+     "name": "dehydrogenation",
+     "residues": [
+      {
+       "applies_to": "Gly",
+       "label": "Gly[dehydrogenation]",
+       "mass": 55.00581,
+       "modification": "dehydrogenation",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Ala",
+       "label": "Ala[dehydrogenation]",
+       "mass": 69.02146,
+       "modification": "dehydrogenation",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Ser",
+       "label": "Ser[dehydrogenation]",
+       "mass": 85.01638,
+       "modification": "dehydrogenation",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Pro",
+       "label": "Pro[dehydrogenation]",
+       "mass": 95.03711,
+       "modification": "dehydrogenation",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Val",
+       "label": "Val[dehydrogenation]",
+       "mass": 97.05276,
+       "modification": "dehydrogenation",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Thr",
+       "label": "Thr[dehydrogenation]",
+       "mass": 99.03203,
+       "modification": "dehydrogenation",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Cys",
+       "label": "Cys[dehydrogenation]",
+       "mass": 100.99354,
+       "modification": "dehydrogenation",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Leu/Ile",
+       "label": "Leu/Ile[dehydrogenation]",
+       "mass": 111.06841,
+       "modification": "dehydrogenation",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Asn",
+       "label": "Asn[dehydrogenation]",
+       "mass": 112.02728,
+       "modification": "dehydrogenation",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Asp",
+       "label": "Asp[dehydrogenation]",
+       "mass": 113.01129,
+       "modification": "dehydrogenation",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Gln",
+       "label": "Gln[dehydrogenation]",
+       "mass": 126.04293,
+       "modification": "dehydrogenation",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Lys",
+       "label": "Lys[dehydrogenation]",
+       "mass": 126.07931,
+       "modification": "dehydrogenation",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Glu",
+       "label": "Glu[dehydrogenation]",
+       "mass": 127.02694,
+       "modification": "dehydrogenation",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Met",
+       "label": "Met[dehydrogenation]",
+       "mass": 129.02484,
+       "modification": "dehydrogenation",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "His",
+       "label": "His[dehydrogenation]",
+       "mass": 135.04326,
+       "modification": "dehydrogenation",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Phe",
+       "label": "Phe[dehydrogenation]",
+       "mass": 145.05276,
+       "modification": "dehydrogenation",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Arg",
+       "label": "Arg[dehydrogenation]",
+       "mass": 154.08546,
+       "modification": "dehydrogenation",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Tyr",
+       "label": "Tyr[dehydrogenation]",
+       "mass": 161.04768,
+       "modification": "dehydrogenation",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Trp",
+       "label": "Trp[dehydrogenation]",
+       "mass": 184.06366,
+       "modification": "dehydrogenation",
+       "observed": false,
+       "on_by_default": false
+      }
+     ]
+    }
+   ],
+   "name": "group_oxidation",
+   "topology": null
+  },
+  {
+   "alphabet_size": 21,
+   "kind": "group",
+   "label": "Phosphorylation",
+   "modifications": [
+    {
+     "applies_to": [
+      "Ser",
+      "Thr",
+      "Tyr"
+     ],
+     "delta": 79.96633,
+     "n_on_by_default": 2,
+     "name": "phospho",
+     "residues": [
+      {
+       "applies_to": "Ser",
+       "label": "Ser[phospho]",
+       "mass": 166.99836,
+       "modification": "phospho",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Thr",
+       "label": "Thr[phospho]",
+       "mass": 181.01401,
+       "modification": "phospho",
+       "observed": true,
+       "on_by_default": true
+      },
+      {
+       "applies_to": "Tyr",
+       "label": "Tyr[phospho]",
+       "mass": 243.02966,
+       "modification": "phospho",
+       "observed": true,
+       "on_by_default": true
+      }
+     ]
+    }
+   ],
+   "name": "group_phosphorylation",
+   "topology": null
+  },
+  {
+   "alphabet_size": 20,
+   "kind": "group",
+   "label": "Prenylation",
+   "modifications": [
+    {
+     "applies_to": [
+      "Ser",
+      "Thr",
+      "Tyr",
+      "Trp"
+     ],
+     "delta": 68.0626,
+     "n_on_by_default": 1,
+     "name": "prenyl",
+     "residues": [
+      {
+       "applies_to": null,
+       "label": "dma-Ser",
+       "mass": 155.094,
+       "modification": "prenyl",
+       "observed": true,
+       "on_by_default": true
+      },
+      {
+       "applies_to": "Ser",
+       "label": "Ser[prenyl]",
+       "mass": 155.09463,
+       "modification": "prenyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Thr",
+       "label": "Thr[prenyl]",
+       "mass": 169.11028,
+       "modification": "prenyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Tyr",
+       "label": "Tyr[prenyl]",
+       "mass": 231.12593,
+       "modification": "prenyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Trp",
+       "label": "Trp[prenyl]",
+       "mass": 254.14191,
+       "modification": "prenyl",
+       "observed": false,
+       "on_by_default": false
+      }
+     ]
+    }
+   ],
+   "name": "group_prenylation",
+   "topology": null
+  },
+  {
+   "alphabet_size": 22,
+   "kind": "class",
+   "label": "Lanthipeptide",
+   "modifications": [
+    {
+     "applies_to": [
+      "Ser",
+      "Thr"
+     ],
+     "delta": -18.01056,
+     "n_on_by_default": 2,
+     "name": "dehydration",
+     "residues": [
+      {
+       "applies_to": null,
+       "label": "Dha",
+       "mass": 69.02146,
+       "modification": "dehydration",
+       "observed": true,
+       "on_by_default": true
+      },
+      {
+       "applies_to": "Ser",
+       "label": "Ser[dehydration]",
+       "mass": 69.02147,
+       "modification": "dehydration",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": null,
+       "label": "Dhb",
+       "mass": 83.03711,
+       "modification": "dehydration",
+       "observed": true,
+       "on_by_default": true
+      },
+      {
+       "applies_to": "Thr",
+       "label": "Thr[dehydration]",
+       "mass": 83.03712,
+       "modification": "dehydration",
+       "observed": false,
+       "on_by_default": false
+      }
+     ]
+    },
+    {
+     "applies_to": [
+      "Ser",
+      "Thr",
+      "Cys"
+     ],
+     "delta": -18.01056,
+     "n_on_by_default": 1,
+     "name": "azoline",
+     "residues": [
+      {
+       "applies_to": "Ser",
+       "label": "Ser[azoline]",
+       "mass": 69.02147,
+       "modification": "azoline",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Thr",
+       "label": "Thr[azoline]",
+       "mass": 83.03712,
+       "modification": "azoline",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Cys",
+       "label": "Cys[azoline]",
+       "mass": 84.99863,
+       "modification": "azoline",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": null,
+       "label": "Thn",
+       "mass": 103.00918,
+       "modification": "azoline",
+       "observed": true,
+       "on_by_default": true
+      }
+     ]
+    }
+   ],
+   "name": "lanthipeptide",
+   "topology": "linear_with_thioether_rings"
+  },
+  {
+   "alphabet_size": 19,
+   "kind": "class",
+   "label": "Lasso peptide",
+   "modifications": [],
+   "name": "lasso_peptide",
+   "topology": "lariat_knot"
+  },
+  {
+   "alphabet_size": 20,
+   "kind": "class",
+   "label": "Linaridin",
+   "modifications": [
+    {
+     "applies_to": [
+      "Ser",
+      "Thr"
+     ],
+     "delta": -18.01056,
+     "n_on_by_default": 1,
+     "name": "dehydration",
+     "residues": [
+      {
+       "applies_to": "Ser",
+       "label": "Ser[dehydration]",
+       "mass": 69.02147,
+       "modification": "dehydration",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": null,
+       "label": "Dhb",
+       "mass": 83.03711,
+       "modification": "dehydration",
+       "observed": true,
+       "on_by_default": true
+      },
+      {
+       "applies_to": "Thr",
+       "label": "Thr[dehydration]",
+       "mass": 83.03712,
+       "modification": "dehydration",
+       "observed": false,
+       "on_by_default": false
+      }
+     ]
+    },
+    {
+     "applies_to": "any",
+     "delta": 14.01565,
+     "n_on_by_default": 0,
+     "name": "methyl",
+     "residues": [
+      {
+       "applies_to": "Gly",
+       "label": "Gly[methyl]",
+       "mass": 71.03711,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Ala",
+       "label": "Ala[methyl]",
+       "mass": 85.05276,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Ser",
+       "label": "Ser[methyl]",
+       "mass": 101.04768,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Pro",
+       "label": "Pro[methyl]",
+       "mass": 111.06841,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Val",
+       "label": "Val[methyl]",
+       "mass": 113.08406,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Thr",
+       "label": "Thr[methyl]",
+       "mass": 115.06333,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Cys",
+       "label": "Cys[methyl]",
+       "mass": 117.02484,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Leu/Ile",
+       "label": "Leu/Ile[methyl]",
+       "mass": 127.09971,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Asn",
+       "label": "Asn[methyl]",
+       "mass": 128.05858,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Asp",
+       "label": "Asp[methyl]",
+       "mass": 129.04259,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Gln",
+       "label": "Gln[methyl]",
+       "mass": 142.07423,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Lys",
+       "label": "Lys[methyl]",
+       "mass": 142.11061,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Glu",
+       "label": "Glu[methyl]",
+       "mass": 143.05824,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Met",
+       "label": "Met[methyl]",
+       "mass": 145.05614,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "His",
+       "label": "His[methyl]",
+       "mass": 151.07456,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Phe",
+       "label": "Phe[methyl]",
+       "mass": 161.08406,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Arg",
+       "label": "Arg[methyl]",
+       "mass": 170.11676,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Tyr",
+       "label": "Tyr[methyl]",
+       "mass": 177.07898,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Trp",
+       "label": "Trp[methyl]",
+       "mass": 200.09496,
+       "modification": "methyl",
+       "observed": false,
+       "on_by_default": false
+      }
+     ]
+    }
+   ],
+   "name": "linaridin",
+   "topology": "linear"
+  },
+  {
+   "alphabet_size": 22,
+   "kind": "class",
+   "label": "Thiopeptide",
+   "modifications": [
+    {
+     "applies_to": [
+      "Ser",
+      "Thr"
+     ],
+     "delta": -18.01056,
+     "n_on_by_default": 1,
+     "name": "dehydration",
+     "residues": [
+      {
+       "applies_to": null,
+       "label": "Dha",
+       "mass": 69.02146,
+       "modification": "dehydration",
+       "observed": true,
+       "on_by_default": true
+      },
+      {
+       "applies_to": "Ser",
+       "label": "Ser[dehydration]",
+       "mass": 69.02147,
+       "modification": "dehydration",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Thr",
+       "label": "Thr[dehydration]",
+       "mass": 83.03712,
+       "modification": "dehydration",
+       "observed": false,
+       "on_by_default": false
+      }
+     ]
+    },
+    {
+     "applies_to": [
+      "Ser",
+      "Thr",
+      "Cys"
+     ],
+     "delta": -20.02621,
+     "n_on_by_default": 2,
+     "name": "azole",
+     "residues": [
+      {
+       "applies_to": "Ser",
+       "label": "Ser[azole]",
+       "mass": 67.00582,
+       "modification": "azole",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Thr",
+       "label": "Thr[azole]",
+       "mass": 81.02147,
+       "modification": "azole",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Cys",
+       "label": "Cys[azole]",
+       "mass": 82.98298,
+       "modification": "azole",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": null,
+       "label": "Gly-MOxa",
+       "mass": 138.04293,
+       "modification": "azole",
+       "observed": true,
+       "on_by_default": true
+      },
+      {
+       "applies_to": null,
+       "label": "Ala-Thz",
+       "mass": 154.02009,
+       "modification": "azole",
+       "observed": true,
+       "on_by_default": true
+      }
+     ]
+    },
+    {
+     "applies_to": [
+      "Ser",
+      "Thr",
+      "Cys"
+     ],
+     "delta": -18.01056,
+     "n_on_by_default": 0,
+     "name": "azoline",
+     "residues": [
+      {
+       "applies_to": "Ser",
+       "label": "Ser[azoline]",
+       "mass": 69.02147,
+       "modification": "azoline",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Thr",
+       "label": "Thr[azoline]",
+       "mass": 83.03712,
+       "modification": "azoline",
+       "observed": false,
+       "on_by_default": false
+      },
+      {
+       "applies_to": "Cys",
+       "label": "Cys[azoline]",
+       "mass": 84.99863,
+       "modification": "azoline",
+       "observed": false,
+       "on_by_default": false
+      }
+     ]
+    }
+   ],
+   "name": "thiopeptide",
+   "topology": "macrocycle_through_pyridine"
+  }
+ ],
+ "min_residue": 40.0,
+ "offered": {
+  "cyanobactin": {
+   "N-methyl": {
+    "Ala[N-methyl]": 85.05281,
+    "Arg[N-methyl]": 170.11681,
+    "Asn[N-methyl]": 128.05863,
+    "Asp[N-methyl]": 129.04264,
+    "Cys[N-methyl]": 117.02489,
+    "Gln[N-methyl]": 142.07428,
+    "Glu[N-methyl]": 143.05829,
+    "Gly[N-methyl]": 71.03716,
+    "His[N-methyl]": 151.07461,
+    "Leu/Ile[N-methyl]": 127.09976,
+    "Lys[N-methyl]": 142.11066,
+    "Met[N-methyl]": 145.05619,
+    "Phe[N-methyl]": 161.08411,
+    "Pro[N-methyl]": 111.06846,
+    "Ser[N-methyl]": 101.04773,
+    "Thr[N-methyl]": 115.06338,
+    "Trp[N-methyl]": 200.09501,
+    "Tyr[N-methyl]": 177.07903,
+    "Val[N-methyl]": 113.08411
+   },
+   "azole": {
+    "Cys[azole]": 82.98298,
+    "Phe-Oxa": 214.07423,
+    "Ser[azole]": 67.00582,
+    "Thr[azole]": 81.02147
+   },
+   "azoline": {
+    "Cys[azoline]": 84.99863,
+    "Leu/Ile-Thn": 198.08269,
+    "Pro-MOxn": 180.08988,
+    "Ser[azoline]": 69.02147,
+    "Thr[azoline]": 83.03712
+   },
+   "phospho": {
+    "Ser[phospho]": 166.99836,
+    "Thr[phospho]": 181.01401,
+    "Tyr[phospho]": 243.02966
+   },
+   "prenyl": {
+    "Ser[prenyl]": 155.09463,
+    "Thr[prenyl]": 169.11028,
+    "Trp[prenyl]": 254.14191,
+    "Tyr[prenyl]": 231.12593,
+    "dma-Ser": 155.094
+   }
+  },
+  "group_dehydration": {
+   "dehydration": {
+    "Dha": 69.02146,
+    "Dhb": 83.03711,
+    "Ser[dehydration]": 69.02147,
+    "Thr[dehydration]": 83.03712
+   }
+  },
+  "group_heterocycle": {
+   "azole": {
+    "Ala-Thz": 154.02009,
+    "Cys[azole]": 82.98298,
+    "Gly-MOxa": 138.04293,
+    "Phe-Oxa": 214.07423,
+    "Ser[azole]": 67.00582,
+    "Thr[azole]": 81.02147
+   },
+   "azoline": {
+    "Cys[azoline]": 84.99863,
+    "Leu/Ile-Thn": 198.08269,
+    "Pro-MOxn": 180.08988,
+    "Ser[azoline]": 69.02147,
+    "Thn": 103.00918,
+    "Thr[azoline]": 83.03712
+   }
+  },
+  "group_hydration": {
+   "hydration": {
+    "Asp[hydration]": 133.0375,
+    "Glu[hydration]": 147.05315,
+    "Ser[hydration]": 105.04259,
+    "Thr[hydration]": 119.05824
+   }
+  },
+  "group_methylation": {
+   "methyl": {
+    "Ala[methyl]": 85.05276,
+    "Arg[methyl]": 170.11676,
+    "Asn[methyl]": 128.05858,
+    "Asp[methyl]": 129.04259,
+    "Cys[methyl]": 117.02484,
+    "Gln[methyl]": 142.07423,
+    "Glu[methyl]": 143.05824,
+    "Gly[methyl]": 71.03711,
+    "His[methyl]": 151.07456,
+    "Leu/Ile[methyl]": 127.09971,
+    "Lys[methyl]": 142.11061,
+    "Met[methyl]": 145.05614,
+    "Phe[methyl]": 161.08406,
+    "Pro[methyl]": 111.06841,
+    "Ser[methyl]": 101.04768,
+    "Thr[methyl]": 115.06333,
+    "Trp[methyl]": 200.09496,
+    "Tyr[methyl]": 177.07898,
+    "Val[methyl]": 113.08406
+   }
+  },
+  "group_oxidation": {
+   "dehydrogenation": {
+    "Ala[dehydrogenation]": 69.02146,
+    "Arg[dehydrogenation]": 154.08546,
+    "Asn[dehydrogenation]": 112.02728,
+    "Asp[dehydrogenation]": 113.01129,
+    "Cys[dehydrogenation]": 100.99354,
+    "Gln[dehydrogenation]": 126.04293,
+    "Glu[dehydrogenation]": 127.02694,
+    "Gly[dehydrogenation]": 55.00581,
+    "His[dehydrogenation]": 135.04326,
+    "Leu/Ile[dehydrogenation]": 111.06841,
+    "Lys[dehydrogenation]": 126.07931,
+    "Met[dehydrogenation]": 129.02484,
+    "Phe[dehydrogenation]": 145.05276,
+    "Pro[dehydrogenation]": 95.03711,
+    "Ser[dehydrogenation]": 85.01638,
+    "Thr[dehydrogenation]": 99.03203,
+    "Trp[dehydrogenation]": 184.06366,
+    "Tyr[dehydrogenation]": 161.04768,
+    "Val[dehydrogenation]": 97.05276
+   },
+   "hydroxyl": {
+    "Arg[hydroxyl]": 172.09602,
+    "Leu/Ile[hydroxyl]": 129.07897,
+    "Lys[hydroxyl]": 144.08987,
+    "Phe[hydroxyl]": 163.06332,
+    "Pro[hydroxyl]": 113.04767,
+    "Trp[hydroxyl]": 202.07422,
+    "Tyr[hydroxyl]": 179.05824,
+    "Val[hydroxyl]": 115.06332
+   }
+  },
+  "group_phosphorylation": {
+   "phospho": {
+    "Ser[phospho]": 166.99836,
+    "Thr[phospho]": 181.01401,
+    "Tyr[phospho]": 243.02966
+   }
+  },
+  "group_prenylation": {
+   "prenyl": {
+    "Ser[prenyl]": 155.09463,
+    "Thr[prenyl]": 169.11028,
+    "Trp[prenyl]": 254.14191,
+    "Tyr[prenyl]": 231.12593,
+    "dma-Ser": 155.094
+   }
+  },
+  "lanthipeptide": {
+   "azoline": {
+    "Cys[azoline]": 84.99863,
+    "Ser[azoline]": 69.02147,
+    "Thn": 103.00918,
+    "Thr[azoline]": 83.03712
+   },
+   "dehydration": {
+    "Dha": 69.02146,
+    "Dhb": 83.03711,
+    "Ser[dehydration]": 69.02147,
+    "Thr[dehydration]": 83.03712
+   }
+  },
+  "lasso_peptide": {},
+  "linaridin": {
+   "dehydration": {
+    "Dhb": 83.03711,
+    "Ser[dehydration]": 69.02147,
+    "Thr[dehydration]": 83.03712
+   },
+   "methyl": {
+    "Ala[methyl]": 85.05276,
+    "Arg[methyl]": 170.11676,
+    "Asn[methyl]": 128.05858,
+    "Asp[methyl]": 129.04259,
+    "Cys[methyl]": 117.02484,
+    "Gln[methyl]": 142.07423,
+    "Glu[methyl]": 143.05824,
+    "Gly[methyl]": 71.03711,
+    "His[methyl]": 151.07456,
+    "Leu/Ile[methyl]": 127.09971,
+    "Lys[methyl]": 142.11061,
+    "Met[methyl]": 145.05614,
+    "Phe[methyl]": 161.08406,
+    "Pro[methyl]": 111.06841,
+    "Ser[methyl]": 101.04768,
+    "Thr[methyl]": 115.06333,
+    "Trp[methyl]": 200.09496,
+    "Tyr[methyl]": 177.07898,
+    "Val[methyl]": 113.08406
+   }
+  },
+  "thiopeptide": {
+   "azole": {
+    "Ala-Thz": 154.02009,
+    "Cys[azole]": 82.98298,
+    "Gly-MOxa": 138.04293,
+    "Ser[azole]": 67.00582,
+    "Thr[azole]": 81.02147
+   },
+   "azoline": {
+    "Cys[azoline]": 84.99863,
+    "Ser[azoline]": 69.02147,
+    "Thr[azoline]": 83.03712
+   },
+   "dehydration": {
+    "Dha": 69.02146,
+    "Ser[dehydration]": 69.02147,
+    "Thr[dehydration]": 83.03712
+   }
+  }
+ },
+ "sets": {
+  "cyanobactin": {
+   "Ala": 71.03711,
+   "Arg": 156.10111,
+   "Asn": 114.04293,
+   "Asp": 115.02694,
+   "Cys": 103.00919,
+   "Gln": 128.05858,
+   "Glu": 129.04259,
+   "Gly": 57.02146,
+   "His": 137.05891,
+   "Leu/Ile": 113.08406,
+   "Leu/Ile-Thn": 198.0826853,
+   "Lys": 128.09496,
+   "Met": 131.04049,
+   "Phe": 147.06841,
+   "Phe-Oxa": 214.0742252,
+   "Pro": 97.05276,
+   "Pro-MOxn": 180.0898753,
+   "Ser": 87.03203,
+   "Thr": 101.04768,
+   "Thr[phospho]": 181.01401049999998,
+   "Trp": 186.07931,
+   "Tyr": 163.06333,
+   "Tyr[phospho]": 243.0296605,
+   "Val": 99.06841,
+   "dma-Ser": 155.094
+  },
+  "group_dehydration": {
+   "Ala": 71.03711,
+   "Arg": 156.10111,
+   "Asn": 114.04293,
+   "Asp": 115.02694,
+   "Cys": 103.00919,
+   "Dha": 69.021464,
+   "Dhb": 83.037114,
+   "Gln": 128.05858,
+   "Glu": 129.04259,
+   "Gly": 57.02146,
+   "His": 137.05891,
+   "Leu/Ile": 113.08406,
+   "Lys": 128.09496,
+   "Met": 131.04049,
+   "Phe": 147.06841,
+   "Pro": 97.05276,
+   "Ser": 87.03203,
+   "Thr": 101.04768,
+   "Trp": 186.07931,
+   "Tyr": 163.06333,
+   "Val": 99.06841
+  },
+  "group_heterocycle": {
+   "Ala": 71.03711,
+   "Ala-Thz": 154.0200852,
+   "Arg": 156.10111,
+   "Asn": 114.04293,
+   "Asp": 115.02694,
+   "Cys": 103.00919,
+   "Gln": 128.05858,
+   "Glu": 129.04259,
+   "Gly": 57.02146,
+   "Gly-MOxa": 138.0429252,
+   "His": 137.05891,
+   "Leu/Ile": 113.08406,
+   "Leu/Ile-Thn": 198.0826853,
+   "Lys": 128.09496,
+   "Met": 131.04049,
+   "Phe": 147.06841,
+   "Phe-Oxa": 214.0742252,
+   "Pro": 97.05276,
+   "Pro-MOxn": 180.0898753,
+   "Ser": 87.03203,
+   "Thn": 103.009184,
+   "Thr": 101.04768,
+   "Trp": 186.07931,
+   "Tyr": 163.06333,
+   "Val": 99.06841
+  },
+  "group_hydration": {
+   "Ala": 71.03711,
+   "Arg": 156.10111,
+   "Asn": 114.04293,
+   "Asp": 115.02694,
+   "Cys": 103.00919,
+   "Gln": 128.05858,
+   "Glu": 129.04259,
+   "Gly": 57.02146,
+   "His": 137.05891,
+   "Leu/Ile": 113.08406,
+   "Lys": 128.09496,
+   "Met": 131.04049,
+   "Phe": 147.06841,
+   "Pro": 97.05276,
+   "Ser": 87.03203,
+   "Thr": 101.04768,
+   "Trp": 186.07931,
+   "Tyr": 163.06333,
+   "Val": 99.06841
+  },
+  "group_methylation": {
+   "Ala": 71.03711,
+   "Arg": 156.10111,
+   "Asn": 114.04293,
+   "Asp": 115.02694,
+   "Cys": 103.00919,
+   "Gln": 128.05858,
+   "Glu": 129.04259,
+   "Gly": 57.02146,
+   "His": 137.05891,
+   "Leu/Ile": 113.08406,
+   "Lys": 128.09496,
+   "Met": 131.04049,
+   "Phe": 147.06841,
+   "Pro": 97.05276,
+   "Ser": 87.03203,
+   "Thr": 101.04768,
+   "Trp": 186.07931,
+   "Tyr": 163.06333,
+   "Val": 99.06841
+  },
+  "group_oxidation": {
+   "Ala": 71.03711,
+   "Arg": 156.10111,
+   "Asn": 114.04293,
+   "Asp": 115.02694,
+   "Cys": 103.00919,
+   "Gln": 128.05858,
+   "Glu": 129.04259,
+   "Gly": 57.02146,
+   "His": 137.05891,
+   "Leu/Ile": 113.08406,
+   "Lys": 128.09496,
+   "Met": 131.04049,
+   "Phe": 147.06841,
+   "Pro": 97.05276,
+   "Ser": 87.03203,
+   "Thr": 101.04768,
+   "Trp": 186.07931,
+   "Tyr": 163.06333,
+   "Val": 99.06841
+  },
+  "group_phosphorylation": {
+   "Ala": 71.03711,
+   "Arg": 156.10111,
+   "Asn": 114.04293,
+   "Asp": 115.02694,
+   "Cys": 103.00919,
+   "Gln": 128.05858,
+   "Glu": 129.04259,
+   "Gly": 57.02146,
+   "His": 137.05891,
+   "Leu/Ile": 113.08406,
+   "Lys": 128.09496,
+   "Met": 131.04049,
+   "Phe": 147.06841,
+   "Pro": 97.05276,
+   "Ser": 87.03203,
+   "Thr": 101.04768,
+   "Thr[phospho]": 181.01401049999998,
+   "Trp": 186.07931,
+   "Tyr": 163.06333,
+   "Tyr[phospho]": 243.0296605,
+   "Val": 99.06841
+  },
+  "group_prenylation": {
+   "Ala": 71.03711,
+   "Arg": 156.10111,
+   "Asn": 114.04293,
+   "Asp": 115.02694,
+   "Cys": 103.00919,
+   "Gln": 128.05858,
+   "Glu": 129.04259,
+   "Gly": 57.02146,
+   "His": 137.05891,
+   "Leu/Ile": 113.08406,
+   "Lys": 128.09496,
+   "Met": 131.04049,
+   "Phe": 147.06841,
+   "Pro": 97.05276,
+   "Ser": 87.03203,
+   "Thr": 101.04768,
+   "Trp": 186.07931,
+   "Tyr": 163.06333,
+   "Val": 99.06841,
+   "dma-Ser": 155.094
+  },
+  "lanthipeptide": {
+   "Ala": 71.03711,
+   "Arg": 156.10111,
+   "Asn": 114.04293,
+   "Asp": 115.02694,
+   "Cys": 103.00919,
+   "Dha": 69.021464,
+   "Dhb": 83.037114,
+   "Gln": 128.05858,
+   "Glu": 129.04259,
+   "Gly": 57.02146,
+   "His": 137.05891,
+   "Leu/Ile": 113.08406,
+   "Lys": 128.09496,
+   "Met": 131.04049,
+   "Phe": 147.06841,
+   "Pro": 97.05276,
+   "Ser": 87.03203,
+   "Thn": 103.009184,
+   "Thr": 101.04768,
+   "Trp": 186.07931,
+   "Tyr": 163.06333,
+   "Val": 99.06841
+  },
+  "lasso_peptide": {
+   "Ala": 71.03711,
+   "Arg": 156.10111,
+   "Asn": 114.04293,
+   "Asp": 115.02694,
+   "Cys": 103.00919,
+   "Gln": 128.05858,
+   "Glu": 129.04259,
+   "Gly": 57.02146,
+   "His": 137.05891,
+   "Leu/Ile": 113.08406,
+   "Lys": 128.09496,
+   "Met": 131.04049,
+   "Phe": 147.06841,
+   "Pro": 97.05276,
+   "Ser": 87.03203,
+   "Thr": 101.04768,
+   "Trp": 186.07931,
+   "Tyr": 163.06333,
+   "Val": 99.06841
+  },
+  "linaridin": {
+   "Ala": 71.03711,
+   "Arg": 156.10111,
+   "Asn": 114.04293,
+   "Asp": 115.02694,
+   "Cys": 103.00919,
+   "Dhb": 83.037114,
+   "Gln": 128.05858,
+   "Glu": 129.04259,
+   "Gly": 57.02146,
+   "His": 137.05891,
+   "Leu/Ile": 113.08406,
+   "Lys": 128.09496,
+   "Met": 131.04049,
+   "Phe": 147.06841,
+   "Pro": 97.05276,
+   "Ser": 87.03203,
+   "Thr": 101.04768,
+   "Trp": 186.07931,
+   "Tyr": 163.06333,
+   "Val": 99.06841
+  },
+  "thiopeptide": {
+   "Ala": 71.03711,
+   "Ala-Thz": 154.0200852,
+   "Arg": 156.10111,
+   "Asn": 114.04293,
+   "Asp": 115.02694,
+   "Cys": 103.00919,
+   "Dha": 69.021464,
+   "Gln": 128.05858,
+   "Glu": 129.04259,
+   "Gly": 57.02146,
+   "Gly-MOxa": 138.0429252,
+   "His": 137.05891,
+   "Leu/Ile": 113.08406,
+   "Lys": 128.09496,
+   "Met": 131.04049,
+   "Phe": 147.06841,
+   "Pro": 97.05276,
+   "Ser": 87.03203,
+   "Thr": 101.04768,
+   "Trp": 186.07931,
+   "Tyr": 163.06333,
+   "Val": 99.06841
+  }
+ },
+ "standard": {
+  "Ala": 71.03711,
+  "Arg": 156.10111,
+  "Asn": 114.04293,
+  "Asp": 115.02694,
+  "Cys": 103.00919,
+  "Gln": 128.05858,
+  "Glu": 129.04259,
+  "Gly": 57.02146,
+  "His": 137.05891,
+  "Leu/Ile": 113.08406,
+  "Lys": 128.09496,
+  "Met": 131.04049,
+  "Phe": 147.06841,
+  "Pro": 97.05276,
+  "Ser": 87.03203,
+  "Thr": 101.04768,
+  "Trp": 186.07931,
+  "Tyr": 163.06333,
+  "Val": 99.06841
+ },
+ "tolerance": {
+  "floor_mda": 5.0,
+  "ppm": 10.0,
+  "rule": "max(5 mDa, 10 ppm) on each peak, summed across the pair, times the charge"
+ },
+ "vocab": {
+  "Ala": 71.03711,
+  "Ala-Thz": 154.0200852,
+  "Arg": 156.10111,
+  "Asn": 114.04293,
+  "Asp": 115.02694,
+  "Cys": 103.00919,
+  "Dha": 69.021464,
+  "Dhb": 83.037114,
+  "Gln": 128.05858,
+  "Glu": 129.04259,
+  "Gly": 57.02146,
+  "Gly-MOxa": 138.0429252,
+  "His": 137.05891,
+  "Leu/Ile": 113.08406,
+  "Leu/Ile-Thn": 198.0826853,
+  "Lys": 128.09496,
+  "Met": 131.04049,
+  "Phe": 147.06841,
+  "Phe-Oxa": 214.0742252,
+  "Pro": 97.05276,
+  "Pro-MOxn": 180.0898753,
+  "Ser": 87.03203,
+  "Thn": 103.009184,
+  "Thr": 101.04768,
+  "Trp": 186.07931,
+  "Tyr": 163.06333,
+  "Val": 99.06841,
+  "dma-Ser": 155.094
+ }
+}

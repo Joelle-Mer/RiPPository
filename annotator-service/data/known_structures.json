@@ -1,0 +1,282 @@
+{
+ "RIPPOS-LU-0001": {
+  "class": "Cyanobactin",
+  "formula": "C24H34N6O4S2",
+  "inchikey": null,
+  "n_units": 3,
+  "neutral_mass": 534.2083,
+  "residues": [
+   "Leu/Ile-Thn",
+   "Leu/Ile-MOxn",
+   "Gly-Thz"
+  ],
+  "smiles": "[H][C@]12CSC(=N1)[C@]([H])(NC(=O)C1=CSC(CNC(=O)[C@@]3([H])N=C(O[C@@H]3C)[C@@]([H])(NC2=O)[C@@H](C)CC)=N1)[C@@H](C)CC",
+  "topology": "cyclic",
+  "unit_labels": [
+   "Leu/Ile-Thn",
+   "Leu/Ile-MOxn",
+   "Gly-Thz"
+  ],
+  "unit_mass": [
+   198.08268,
+   196.12118,
+   140.00443
+  ],
+  "units_are_residues": true
+ },
+ "RIPPOS-LU-0002": {
+  "class": "Cyanobactin",
+  "formula": "C24H32N6O4S2",
+  "inchikey": null,
+  "n_units": 3,
+  "neutral_mass": 532.19265,
+  "residues": [
+   "Leu/Ile-MOxn",
+   "Gly-Thz",
+   "Leu/Ile-Thz"
+  ],
+  "smiles": "[H][C@]12N=C(O[C@@H]1C)[C@@]([H])(NC(=O)C1=CSC(=N1)[C@]([H])(NC(=O)C1=CSC(CNC2=O)=N1)[C@@H](C)CC)[C@@H](C)CC",
+  "topology": "cyclic",
+  "unit_labels": [
+   "Leu/Ile-MOxn",
+   "Gly-Thz",
+   "Leu/Ile-Thz"
+  ],
+  "unit_mass": [
+   196.12118,
+   140.00443,
+   196.06703
+  ],
+  "units_are_residues": true
+ },
+ "RIPPOS-LU-0003": {
+  "class": "Cyanobactin",
+  "formula": "C24H32N6O5S",
+  "inchikey": null,
+  "n_units": 3,
+  "neutral_mass": 516.21549,
+  "residues": [
+   "Ala-MOxn",
+   "Pro-Oxn",
+   "Leu/Ile-Thz"
+  ],
+  "smiles": "[H][C@]12N=C(O[C@@H]1C)[C@H](C)NC(=O)C1=CSC(=N1)[C@]([H])(NC(=O)C1=COC(=N1)[C@@H](NC2=O)C(C)C)[C@@H](C)CC",
+  "topology": "cyclic",
+  "unit_labels": [
+   "Ala-MOxn",
+   "Pro-Oxn",
+   "Leu/Ile-Thz"
+  ],
+  "unit_mass": [
+   154.07423,
+   166.07423,
+   196.06703
+  ],
+  "units_are_residues": true
+ },
+ "RIPPOS-LU-0004": {
+  "class": "Biarylitide",
+  "formula": "C26H27N5O6",
+  "inchikey": null,
+  "n_units": 4,
+  "neutral_mass": 505.19613,
+  "residues": null,
+  "smiles": "OC(C(CC1=CN=C2N1)NC(C(CC3=CC=CC=C3)NC(C(CC4=CC=C(O)C2=C4)NC(C)=O)=O)=O)=O",
+  "topology": "branched",
+  "unit_labels": [
+   "Arg-3.047",
+   "Phe",
+   "Tyr-1.008",
+   "Gly-14.003"
+  ],
+  "unit_mass": [
+   153.05383,
+   147.06841,
+   162.0555,
+   43.01839
+  ],
+  "units_are_residues": null
+ },
+ "RIPPOS-LU-0005": {
+  "class": "Biarylitide",
+  "formula": "C26H27N5O7",
+  "inchikey": null,
+  "n_units": 4,
+  "neutral_mass": 521.19105,
+  "residues": null,
+  "smiles": "OC(C(CC1=CN=C2N1)NC(C(CC3=CC=C(O)C=C3)NC(C(CC4=CC=C(O)C2=C4)NC(C)=O)=O)=O)=O",
+  "topology": "branched",
+  "unit_labels": [
+   "Arg-3.047",
+   "Tyr",
+   "Tyr-1.008",
+   "Gly-14.003"
+  ],
+  "unit_mass": [
+   153.05383,
+   163.06333,
+   162.0555,
+   43.01839
+  ],
+  "units_are_residues": null
+ },
+ "RIPPOS-LU-0006": {
+  "class": "Lanthipeptide",
+  "formula": "C90H125N27O28S5",
+  "inchikey": null,
+  "n_units": 29,
+  "neutral_mass": 2191.77909,
+  "residues": null,
+  "smiles": "O=C([C@H]([C@@H](C)SC1)NC([C@H]2NC([C@H](CC3=CNC4=C3C=CC=C4)NC(C(NC([C@H](C(C)C)NC([C@@H](NC(/C(NC([C@H]([C@@H](C)CC)N)=O)=C/C)=O)CSC2)=O)=O)=C)=O)=O)=O)N(CCC5)[C@@H]5C(NCC(N[C@@H]1C(N[C@@H]([C@@H](C)O)C(N[C@@H]6C(N[C@@H](CCC(O)=O)C(NCC(NCC(NCC(N[C@@H]7C(NCC(N[C@@H](CSC6)C(N[C@@H]8C(N[C@@H](CC9=CN=CN9)C(N[C@H](C(N[C@H](C(O)=O)CSC8)=O)CSC7)=O)=O)=O)=O)=O)=O)=O)=O)=O)=O)=O)=O)=O)=O",
+  "topology": "branched",
+  "unit_labels": [
+   "Ser-2.987",
+   "S",
+   "Ala-1.008",
+   "Ala-1.008",
+   "Trp",
+   "Dha",
+   "Val",
+   "Ala-1.008",
+   "Dhb",
+   "Asn+0.049",
+   "S",
+   "Pro",
+   "Gly",
+   "Thr",
+   "Ala-1.008",
+   "Glu",
+   "Gly",
+   "Gly",
+   "Gly",
+   "Ala-1.008",
+   "Gly",
+   "Ala-1.008",
+   "S",
+   "Ala-1.008",
+   "His",
+   "Ala-1.008",
+   "Oxn",
+   "S",
+   "S"
+  ],
+  "unit_mass": [
+   84.04494,
+   31.97207,
+   70.02929,
+   70.02929,
+   186.07931,
+   69.02146,
+   99.06841,
+   70.02929,
+   83.03711,
+   114.09189,
+   31.97207,
+   97.05276,
+   57.02146,
+   101.04768,
+   70.02929,
+   129.04259,
+   57.02146,
+   57.02146,
+   57.02146,
+   70.02929,
+   57.02146,
+   70.02929,
+   31.97207,
+   70.02929,
+   137.05891,
+   70.02929,
+   87.03203,
+   31.97207,
+   31.97207
+  ],
+  "units_are_residues": null
+ },
+ "RIPPOS-LU-0008": {
+  "class": "Thiopeptide",
+  "formula": "C71H81N19O18S5",
+  "inchikey": null,
+  "n_units": 14,
+  "neutral_mass": 1647.46105,
+  "residues": null,
+  "smiles": "O=C(C(NC(C1=CSC([C@]2(CCC(C3=NC(C(NC(C(NC(C(N)=O)=C)=O)=C)=O)=CS3)=N[C@@H]2C4=CSC(C(NC(C5=CSC(C(NC6=O)[C@@](C)([C@H](O)C)O)=N5)=O)[C@H](OC(C7=NC8=C(C([C@H](O)C)=C7)C=C[C@@H](N[C@H](C(NC(C(NC(C(N[C@]9(C)[H])=O)=C)=O)=C)=O)C(C)C)[C@@H]8O)=O)C)=N4)NC9=O)=N1)=O)C(O)C)N/C(C%10=N[C@@H]6CS%10)=C\\C",
+  "topology": "branched",
+  "unit_labels": [
+   "Thr",
+   "Leu/Ile-2.106",
+   "Pro-3.000",
+   "Leu/Ile-2.106",
+   "Dha",
+   "Ser-1.992",
+   "His+1.974",
+   "Trp+41.978",
+   "Tyr+4.972",
+   "O",
+   "Trp+130.063",
+   "Dha",
+   "Dha",
+   "Ala"
+  ],
+  "unit_mass": [
+   101.04768,
+   110.97788,
+   94.0531,
+   110.97788,
+   69.02146,
+   85.04019,
+   139.03299,
+   228.05686,
+   168.03573,
+   15.99491,
+   316.14231,
+   69.02146,
+   69.02146,
+   71.03711
+  ],
+  "units_are_residues": null
+ },
+ "RIPPOS-LU-0009": {
+  "class": "Thiopeptide",
+  "formula": "C71H81N19O18S5",
+  "inchikey": null,
+  "n_units": 14,
+  "neutral_mass": 1647.46105,
+  "residues": null,
+  "smiles": "O=C(C(NC(C1=CSC([C@]2(CCC(C3=NC(C(NC(C(NC(C(N)=O)=C)=O)=C)=O)=CS3)=N[C@@H]2C4=CSC(C(NC(C5=CSC(C(NC6=O)[C@@](C)([C@H](O)C)O)=N5)=O)[C@H](OC(C7=NC8=C(C([C@H](O)C)=C7)C=C[C@@H](N[C@H](C(NC(C(NC(C(N[C@]9(C)[H])=O)=C)=O)=C)=O)C(C)C)[C@@H]8O)=O)C)=N4)NC9=O)=N1)=O)C(O)C)N/C(C%10=N[C@@H]6CS%10)=C\\C",
+  "topology": "branched",
+  "unit_labels": [
+   "Thr",
+   "Leu/Ile-2.106",
+   "Pro-3.000",
+   "Leu/Ile-2.106",
+   "Dha",
+   "Ser-1.992",
+   "His+1.974",
+   "Trp+41.978",
+   "Tyr+4.972",
+   "O",
+   "Trp+130.063",
+   "Dha",
+   "Dha",
+   "Ala"
+  ],
+  "unit_mass": [
+   101.04768,
+   110.97788,
+   94.0531,
+   110.97788,
+   69.02146,
+   85.04019,
+   139.03299,
+   228.05686,
+   168.03573,
+   15.99491,
+   316.14231,
+   69.02146,
+   69.02146,
+   71.03711
+  ],
+  "units_are_residues": null
+ }
+}

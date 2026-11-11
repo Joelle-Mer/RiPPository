@@ -82,6 +82,17 @@ services:
     deploy:
       replicas: 2
 
+  annotator-service:
+    build:
+      context: ../annotator-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      # the examples on the annotator page are read from the site's own API
+      RIPPOSITORY_API: "http://mb3server:8080${MB3_API_BASE_URL}"
+    ports:
+      - "${ANNOTATOR_SERVICE_PORT:-4148}:8080"
+
   nginx:
     image: nginx:latest
     pull_policy: always
@@ -106,6 +117,7 @@ services:
       - mb3server
       - export-service
       - nginx
+      - annotator-service
 
   export-service:
     platform: linux/amd64
@@ -140,6 +152,7 @@ services:
         VITE_GITHUB_OWNER: ${VITE_GITHUB_OWNER}
         VITE_GITHUB_DATA_REPO: ${VITE_GITHUB_DATA_REPO}
         VITE_GITHUB_BASE_BRANCH: ${VITE_GITHUB_BASE_BRANCH}
+        VITE_FEEDBACK_EMAIL: ${VITE_FEEDBACK_EMAIL:-}
     restart: unless-stopped
     environment:
       MB3_API_URL: "${MB3_API_URL}"
@@ -184,4 +197,3 @@ services:
       MB_DATA_DIRECTORY: "/RiPP-data"
     volumes:
       - "${MB_DATA_DIRECTORY}:/RiPP-data:ro"
-

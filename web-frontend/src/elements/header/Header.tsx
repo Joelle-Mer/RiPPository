@@ -43,6 +43,7 @@ function Header({ height }: InputProps) {
         .filter(
           (route) =>
             route.id === routes.content.id ||
+            route.id === routes.annotate.id ||
             route.id === routes.more.id ||
             route.id === routes.submit.id,
         )
