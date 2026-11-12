@@ -11,7 +11,6 @@ import {
   Space,
   Tag,
   Upload,
-  Checkbox,
 } from 'antd';
 import {
   DownloadOutlined,
@@ -108,6 +107,8 @@ function AnnotateView() {
   const [example, setExample] = useState<string | null>(null);
   // label gaps no residue fits with their mass
   const [gapMass, setGapMass] = useState(true);
+  // also read a gap as two residues where the peak between them is missing; off by default
+  const [doubles, setDoubles] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadNote, setUploadNote] = useState<string | null>(null);
   const [pasting, setPasting] = useState(false);
@@ -178,9 +179,10 @@ function AnnotateView() {
           exclude,
           custom,
           tolerance,
+          doubles,
         }
       : null;
-  }, [charge, className, custom, exclude, include, peaks, tolerance]);
+  }, [charge, className, custom, doubles, exclude, include, peaks, tolerance]);
 
   const ordered = useMemo(() => [...picks].sort((a, b) => a - b), [picks]);
   const anchor = picks.length > 0 ? picks[picks.length - 1] : null;
@@ -530,6 +532,7 @@ function AnnotateView() {
         color: savedColors[(id - 1) % savedColors.length],
         charge,
         tolerance,
+        doubles,
         picks: ordered,
         // gaps no residue fits are kept too, shown while gap masses are switched on
         marks: chainMarks([
@@ -550,6 +553,7 @@ function AnnotateView() {
     setHighlight([]);
   }, [
     charge,
+    doubles,
     ordered,
     position,
     shownLinks,
@@ -615,6 +619,9 @@ function AnnotateView() {
       const { unit, value } = chain.tolerance;
       setErrorUnit(unit);
       setLimits((current) => ({ ...current, [unit]: value }));
+    }
+    if (chain.doubles !== undefined) {
+      setDoubles(chain.doubles);
     }
     setHighlight([]);
     setPicks(chain.picks);
@@ -748,6 +755,8 @@ function AnnotateView() {
         excluded_residues: exclude,
         error_limit: tolerance,
         error_limit_rule: meta.data?.tolerance.rule ?? null,
+        gap_masses_shown: gapMass,
+        two_residue_jumps: doubles,
         intensity_filter_percent: minIntensity,
         saved_chains_hidden_by_filter: hiddenChains,
       },
@@ -779,8 +788,10 @@ function AnnotateView() {
     comparisons.data,
     custom,
     customRecords.data,
+    doubles,
     exclude,
     fileName,
+    gapMass,
     include,
     tolerance,
     meta.data,
@@ -961,15 +972,6 @@ function AnnotateView() {
                 onChange={handleMinIntensity}
               />
             </div>
-            <div className="annotate-field">
-              Gaps with no residue
-              <Checkbox
-                checked={gapMass}
-                onChange={(event) => setGapMass(event.target.checked)}
-              >
-                Show their mass
-              </Checkbox>
-            </div>
             {spectrum && (
               <p className="annotate-meta">
                 Precursor {spectrum.precursor?.toFixed(4) ?? 'unknown'}
@@ -1100,6 +1102,9 @@ function AnnotateView() {
                 onAddPeaks={handleAddPeaks}
                 onSaveChain={ordered.length >= 2 ? handleSaveChain : null}
                 gapMass={gapMass}
+                onGapMassChange={setGapMass}
+                doubles={doubles}
+                onDoublesChange={setDoubles}
                 onRemoveSaved={handleDeleteChain}
               />
               <div className="annotate-selection">
@@ -1261,12 +1266,15 @@ function AnnotateView() {
               Click a peak to pick it, or press Tab to reach the plot and use
               the arrow keys and Enter. Orange marks show peaks one residue
               away, and the table below the plot lists them with their errors.
+              Tick Two-residue jumps, beside the legend, to also mark peaks two
+              residues away where the peak between is missing; these are pink.
+              A single residue is always listed first, and a chain counts a
+              jump as two residues, so chains of single residues come first.
             </li>
             <li>
               Pick more peaks. Each gap between your picks is labelled with the
-              residues that fit it, or &ldquo;no single residue&rdquo; (tick
-              Show their mass, under Gaps with no residue, to see its mass
-              instead). The dashed purple line is the precursor, which you can
+              residues that fit it, or with its mass if none does (untick Mass
+              of gaps with no residue, beside the legend, to hide it). The dashed purple line is the precursor, which you can
               pick too. Ctrl+Z removes the last peak you picked. To pick many at
               once, drag a box with the right mouse button: it picks the peaks
               whose tops are inside it, so both the m/z range and the height

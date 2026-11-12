@@ -74,7 +74,8 @@ function RiPPositoryInfo() {
         >
           The database is actively growing. New RiPP records are continuously being added
           and every contribution is greatly appreciated. If you have data to share, visit
-          the <strong>Submit</strong> page.
+          the <strong>Submit</strong> page. To read your own MS/MS spectrum, try
+          the <strong>Annotate</strong> page.
         </p>
         <div style={{
           display: 'flex', gap: 8, marginTop: 32, position: 'relative',

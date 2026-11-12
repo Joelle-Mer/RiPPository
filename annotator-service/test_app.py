@@ -330,9 +330,10 @@ def test_the_old_tolerance_form_is_refused():
     assert r.status_code == 422
 
 
+@pytest.mark.parametrize("doubles", [False, True])
 @pytest.mark.parametrize("limit", [{"unit": "mDa", "value": 2}, {"unit": "mDa", "value": 10},
                                    {"unit": "ppm", "value": 5}, {"unit": "ppm", "value": 20}])
-def test_no_shown_error_exceeds_the_limit(limit):
+def test_no_shown_error_exceeds_the_limit(limit, doubles):
     # peaks with gaps a little off real residues, at low and high m/z, read at charge 1 and 2
     import random
     rng = random.Random(7)
@@ -346,14 +347,15 @@ def test_no_shown_error_exceeds_the_limit(limit):
         seen = 0
         for i in range(len(peaks)):
             n = client.post("/neighbours", json={"peaks": peaks, "i": i, "charge": charge,
-                                                 "tolerance": limit}).json()["neighbours"]
+                                                 "tolerance": limit,
+                                                 "doubles": doubles}).json()["neighbours"]
             for x in n:
                 for c in x["candidates"]:
                     seen += 1
                     assert abs(c[key]) <= limit["value"] + 0.051, (limit, c)
         for i in range(0, len(peaks) - 1, 3):
             g = client.post("/gap", json={"peaks": peaks, "i": i, "j": i + 1, "charge": charge,
-                                          "tolerance": limit}).json()
+                                          "tolerance": limit, "doubles": doubles}).json()
             for c in g["candidates"]:
                 assert abs(c[key]) <= limit["value"] + 0.051, (limit, c)
         assert seen > 0, "the check saw no matches, so it tested nothing"
@@ -421,3 +423,120 @@ def test_an_unreachable_search_is_explained(monkeypatch):
 def test_each_peak_is_paired_once():
     pairs = service.matched_pairs([[100.0, 1.0], [100.05, 1.0]], [[100.02, 1.0]], None)
     assert len(pairs) == 1
+
+
+# --- two-residue jumps ---------------------------------------------------------------------------
+
+def _gap(peaks, i, j, **kw):
+    return client.post("/gap", json={"peaks": peaks, "i": i, "j": j, **kw}).json()["candidates"]
+
+
+def test_two_residue_jumps_are_off_unless_asked():
+    peaks = [[200.0, 10.0], [200.0 + _a["Pro"] + _a["Val"], 10.0]]
+    assert _gap(peaks, 0, 1) == []
+    on = _gap(peaks, 0, 1, doubles=True)
+    assert [c["label"] for c in on] == ["Pro+Val"]
+    assert on[0]["double"] is True and [p["label"] for p in on[0]["parts"]] == ["Pro", "Val"]
+
+
+def test_a_jump_needs_the_fragment_between_to_be_missing():
+    lo = 200.0
+    hi = lo + _a["Pro"] + _a["Val"]
+    for mid in (lo + _a["Pro"], lo + _a["Val"]):
+        assert _gap([[lo, 10.0], [mid, 10.0], [hi, 10.0]], 0, 2, doubles=True) == []
+    # a peak between them that is not a residue from either end does not block it
+    assert _gap([[lo, 10.0], [lo + 50.0, 10.0], [hi, 10.0]], 0, 2, doubles=True)
+
+
+def test_a_peak_that_splits_the_gap_another_way_blocks_the_jump():
+    # Ala + Val has the mass of Gly + Leu/Ile: with the Ala peak there, neither is a jump
+    lo = 200.0
+    peaks = [[lo, 10.0], [lo + _a["Ala"], 10.0], [lo + _a["Ala"] + _a["Val"], 10.0]]
+    assert [c for c in _gap(peaks, 0, 2, doubles=True) if c.get("double")] == []
+    labels = {c["label"] for c in _gap([peaks[0], peaks[2]], 0, 1, doubles=True)}
+    assert {"Ala+Val", "Gly+Leu/Ile"} <= labels
+
+
+def test_one_residue_is_listed_before_two():
+    # Gly + Gly has the mass of Asn, and Gly + Ala that of Gln: both readings, the single one first
+    for single, double in (("Asn", "Gly+Gly"), ("Gln", "Gly+Ala")):
+        peaks = [[200.0, 10.0], [200.0 + _a[single], 10.0]]
+        assert [c["label"] for c in _gap(peaks, 0, 1, doubles=True)] == [single, double]
+
+
+def test_jumps_use_the_chosen_modifications_and_custom_residues():
+    ser = service.core.alphabet_for("cyanobactin", include=["Ser[phospho]"])["Ser[phospho]"]
+    peaks = [[200.0, 10.0], [200.0 + _a["Gly"] + ser, 10.0]]
+    base = {"class_name": "cyanobactin", "doubles": True}
+    off = [c["label"] for c in _gap(peaks, 0, 1, **base)]
+    on = [c["label"] for c in _gap(peaks, 0, 1, include=["Ser[phospho]"], **base)]
+    assert "Gly+Ser[phospho]" in on and "Gly+Ser[phospho]" not in off
+    mod = {"name": "ac", "delta": 42.01057, "applies_to": ["Gly"]}
+    gac = service.core.custom_residues([mod])[0]["mass"]
+    peaks = [[200.0, 10.0], [200.0 + gac + _a["Pro"], 10.0]]
+    assert "Pro+Gly[ac]" in [c["label"] for c in _gap(peaks, 0, 1, custom=[mod], doubles=True)]
+    assert "Pro+Gly[ac]" not in [c["label"] for c in _gap(peaks, 0, 1, doubles=True)]
+
+
+def _missing_fragment_peaks():
+    # 200 +Gly +Ala, then Pro+Val with nothing between, then +Ser
+    m = [200.0, 200.0 + _a["Gly"], 200.0 + _a["Gly"] + _a["Ala"]]
+    m.append(m[-1] + _a["Pro"] + _a["Val"])
+    m.append(m[-1] + _a["Ser"])
+    return [[x, 10.0] for x in m]
+
+
+def test_neighbours_reach_across_a_missing_fragment_only_when_asked():
+    peaks = _missing_fragment_peaks()
+    off = client.post("/neighbours", json={"peaks": peaks, "i": 2}).json()["neighbours"]
+    on = client.post("/neighbours", json={"peaks": peaks, "i": 2, "doubles": True}).json()
+    assert 3 not in {n["peak"] for n in off}
+    hit = next(n for n in on["neighbours"] if n["peak"] == 3)
+    assert hit["candidates"][0]["label"] == "Pro+Val" and hit["candidates"][0]["double"]
+
+
+def test_a_chain_crosses_a_missing_fragment_counting_it_as_two():
+    peaks = _missing_fragment_peaks()
+    assert client.post("/connect", json={"peaks": peaks, "i": 0, "j": 4}).json()["paths"] == []
+    r = client.post("/connect", json={"peaks": peaks, "i": 0, "j": 4, "doubles": True}).json()
+    assert [p["labels"] for p in r["paths"]] == [["Gln", "Pro+Val", "Ser"],
+                                                 ["Gly", "Ala", "Pro+Val", "Ser"]]
+    assert [p["jumps"] for p in r["paths"]] == [1, 1]
+
+
+def test_chains_put_single_steps_before_jumps():
+    # on random spectra: fewest residues first (a jump is two), then fewest jumps
+    import random
+    rng = random.Random(11)
+    masses = list(_a.values())
+    seen = 0
+    for _ in range(6):
+        mz = [150.0]
+        for _ in range(14):
+            mz.append(mz[-1] + rng.choice(masses) * rng.choice([1, 1, 1, 2]))
+        peaks = [[round(m, 5), 10.0] for m in mz]
+        r = client.post("/connect", json={"peaks": peaks, "i": 0, "j": len(peaks) - 1,
+                                          "doubles": True}).json()["paths"]
+        keys = [(p["steps"] + p["jumps"], p["jumps"]) for p in r]
+        assert keys == sorted(keys)
+        seen += sum(1 for p in r if p["jumps"])
+    assert seen > 0, "no chain used a jump, so the order was not tested"
+
+
+def test_the_precursor_can_be_reached_by_a_jump():
+    pre = 500.0 + _a["Pro"] + _a["Val"]
+    body = {"peaks": [[500.0, 10.0], [pre, 0.0]], "precursor_index": 1, "precursor_mz": pre}
+    off = client.post("/precursor-gaps", json=body).json()["matches"]
+    on = client.post("/precursor-gaps", json={**body, "doubles": True}).json()["matches"]
+    assert off == []
+    labels = [c["label"] for h in on[0]["hypotheses"] for c in h["candidates"]]
+    assert "Pro+Val" in labels
+
+
+def test_three_single_steps_come_before_a_step_and_a_jump():
+    # Pro, Val, Thr through two peaks; or Thr, then Pro+Val across a fragment that is missing
+    lo = 200.0
+    peaks = [[lo, 10.0], [lo + _a["Pro"], 10.0], [lo + _a["Thr"], 10.0],
+             [lo + _a["Pro"] + _a["Val"], 10.0], [lo + _a["Pro"] + _a["Val"] + _a["Thr"], 10.0]]
+    r = client.post("/connect", json={"peaks": peaks, "i": 0, "j": 4, "doubles": True}).json()
+    assert [p["labels"] for p in r["paths"]] == [["Pro", "Val", "Thr"], ["Thr", "Pro+Val"]]

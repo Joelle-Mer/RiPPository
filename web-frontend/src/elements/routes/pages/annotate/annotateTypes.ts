@@ -36,6 +36,9 @@ export interface Candidate {
   mass: number;
   error_mda: number;
   error_ppm?: number;
+  // two residues across a missing fragment, listed after every single residue
+  double?: boolean;
+  parts?: { label: string; mass: number }[];
 }
 
 export interface GapResult {
@@ -58,6 +61,7 @@ export interface Neighbour {
 
 export interface ChainPath {
   steps: number;
+  jumps?: number;
   labels: string[];
   nodes: number[];
   intensity: number;
@@ -136,6 +140,8 @@ export interface Query {
   exclude: string[];
   custom: CustomEntry[];
   tolerance?: Tolerance;
+  // also read a gap as two residues where the fragment between them is missing
+  doubles?: boolean;
 }
 
 // the largest error a shown match may have, in mDa or in ppm of the heavier peak's m/z
@@ -197,6 +203,7 @@ export interface SavedChain {
   color: string;
   charge: number;
   tolerance?: Tolerance;
+  doubles?: boolean;
   picks: number[];
   marks: PeakLink[];
 }

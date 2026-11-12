@@ -107,10 +107,13 @@ function annotateClient(baseUrl: string) {
         {
           steps: chainPath(
             chain.marks.filter((mark) => mark.candidates.length > 0),
-          ).map((mark) => ({
-            label: mark.candidates[0].label,
-            mass: mark.candidates[0].mass,
-          })),
+          ).flatMap((mark) =>
+            // a two-residue jump is compared as its two residues
+            (mark.candidates[0].parts ?? [mark.candidates[0]]).map((r) => ({
+              label: r.label,
+              mass: r.mass,
+            })),
+          ),
           known,
           class_name: q.class_name,
           include: q.include,

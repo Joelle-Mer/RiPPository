@@ -8,6 +8,10 @@ data/known_structures.json.
 Error limit: one limit, in mDa or in ppm. A residue fits a gap only if its error is within the
 limit, so no match shown ever exceeds it. ppm is of the heavier peak's m/z (of the precursor, for a
 distance to the precursor), the way an instrument's accuracy is stated.
+
+Two-residue jumps (off unless asked for): a gap may also be read as two residues of the chosen
+alphabet when the fragment between them is missing, that is when no peak sits where either residue
+alone would end. One residue is always listed before two, and a chain counts a jump as two steps.
 """
 from __future__ import annotations
 
@@ -246,31 +250,103 @@ def _candidate(label, mass, d, ref_mz, charge=1, ppm_digits=1):
             "error_ppm": round(ppm, ppm_digits) if ppm is not None else None}
 
 
+def _double(label, mass, parts, d, ref_mz, charge=1, ppm_digits=1):
+    c = _candidate(label, mass, d, ref_mz, charge, ppm_digits)
+    c["double"] = True
+    c["parts"] = [{"label": l, "mass": round(m, 5)} for l, m in parts]
+    return c
+
+
+class _Fit:
+    """What fits a gap in the chosen alphabet: single residues, and two-residue jumps if asked for."""
+
+    def __init__(self, alphabet, peaks, charge, limit, doubles=False):
+        self.z = charge
+        self.limit = limit
+        self.items = sorted(alphabet.items(), key=lambda kv: (kv[1], kv[0]))
+        self.vals = [m for _l, m in self.items]
+        self.pairs = []
+        if doubles:
+            use = [(l, m) for l, m in self.items if m >= MIN_RES]
+            for x in range(len(use)):
+                for y in range(x, len(use)):
+                    (l1, m1), (l2, m2) = use[x], use[y]
+                    self.pairs.append((m1 + m2, f"{l1}+{l2}", ((l1, m1), (l2, m2))))
+            self.pairs.sort()
+        self.pvals = [m for m, _l, _p in self.pairs]
+        self.mzs = sorted(float(p[0]) for p in peaks)
+        self.lowest = self.vals[0] if self.vals else 0.0
+        self.highest = max(self.vals[-1] if self.vals else 0.0,
+                           self.pvals[-1] if self.pvals else 0.0)
+
+    def _peak_near(self, mz):
+        w = self.limit.window(mz, self.z) / self.z
+        k = bisect.bisect_left(self.mzs, mz - w)
+        return k < len(self.mzs) and self.mzs[k] <= mz + w
+
+    def _single(self, d, ref_mz):
+        t = self.limit.window(ref_mz, self.z)
+        k = bisect.bisect_left(self.vals, d - t)
+        return k < len(self.vals) and self.vals[k] <= d + t
+
+    def middle_missing(self, low_mz, parts, high_mz):
+        """True when the fragment between the two residues is missing: no peak sits where either
+        residue alone would end, and no peak between the two splits the gap into two residues."""
+        if any(self._peak_near(low_mz + m / self.z) for _l, m in parts):
+            return False
+        k = bisect.bisect_right(self.mzs, low_mz)
+        while k < len(self.mzs) and self.mzs[k] < high_mz:
+            mid = self.mzs[k]
+            if (self._single((mid - low_mz) * self.z, mid)
+                    and self._single((high_mz - mid) * self.z, high_mz)):
+                return False
+            k += 1
+        return True
+
+    def fits(self, d, ref_mz, low_mz, ppm_digits=1):
+        """-> candidates for a gap d (Da): residues closest first, then two-residue jumps closest first."""
+        t = self.limit.window(ref_mz, self.z)
+        k = bisect.bisect_left(self.vals, d - t)
+        one = []
+        while k < len(self.vals) and self.vals[k] <= d + t:
+            one.append(_candidate(self.items[k][0], self.items[k][1], d, ref_mz, self.z, ppm_digits))
+            k += 1
+        one.sort(key=lambda c: abs(c["error_mda"]))
+        two = []
+        if self.pairs:
+            k = bisect.bisect_left(self.pvals, d - t)
+            while k < len(self.pvals) and self.pvals[k] <= d + t:
+                m, lab, parts = self.pairs[k]
+                if self.middle_missing(low_mz, parts, low_mz + d / self.z):
+                    two.append(_double(lab, m, parts, d, ref_mz, self.z, ppm_digits))
+                k += 1
+            two.sort(key=lambda c: abs(c["error_mda"]))
+        return one + two
+
+
 def gap(peaks, i, j, class_name="standard", charge=1, include=None, exclude=None,
-        custom=None, tolerance=None):
+        custom=None, tolerance=None, doubles=False):
     """Two peaks -> every residue that fits the difference, closest first, with its error."""
     _check_index(peaks, i, j)
     a = alphabet_for(class_name, include, exclude, custom)
     limit = error_limit(tolerance)
+    fit = _Fit(a, peaks, charge, limit, doubles)
     mz_i, mz_j = sorted((peaks[i][0], peaks[j][0]))
     d = (mz_j - mz_i) * charge
     t = limit.window(mz_j, charge)
-    cands = [_candidate(lab, m, d, mz_j, charge) for lab, m in sorted(a.items(), key=lambda kv: kv[1])
-             if abs(m - d) <= t]
-    cands.sort(key=lambda c: abs(c["error_mda"]))
+    cands = fit.fits(d, mz_j, mz_i)
     return {"gap": round(d, 5), "tol": round(t, 5), "charge": charge, "candidates": cands,
             "class": class_name, "alphabet_size": len(a), "peaks": [i, j],
             "custom": custom_residues(custom, class_name, include, exclude)}
 
 
 def neighbours(peaks, i, class_name="standard", charge=1, include=None, exclude=None,
-               direction="both", custom=None, tolerance=None):
-    """Every peak one residue away from peak i."""
+               direction="both", custom=None, tolerance=None, doubles=False):
+    """Every peak one residue away from peak i (or two, across a missing fragment, if asked)."""
     _check_index(peaks, i)
     a = alphabet_for(class_name, include, exclude, custom)
     limit = error_limit(tolerance)
-    items = sorted(a.items(), key=lambda kv: kv[1])
-    vals = [m for _l, m in items]
+    fit = _Fit(a, peaks, charge, limit, doubles)
     mz_i = peaks[i][0]
     out = []
     for j, (mz_j, inten) in enumerate(peaks):
@@ -283,15 +359,10 @@ def neighbours(peaks, i, class_name="standard", charge=1, include=None, exclude=
         ad = abs(d)
         heavier = max(mz_i, mz_j)
         t = limit.window(heavier, charge)
-        if ad < vals[0] - t or ad > vals[-1] + t:
+        if ad < fit.lowest - t or ad > fit.highest + t:
             continue
-        k = bisect.bisect_left(vals, ad - t)
-        cands = []
-        while k < len(vals) and vals[k] <= ad + t:
-            cands.append(_candidate(items[k][0], items[k][1], ad, heavier, charge))
-            k += 1
+        cands = fit.fits(ad, heavier, min(mz_i, mz_j))
         if cands:
-            cands.sort(key=lambda c: abs(c["error_mda"]))
             out.append({"peak": j, "mz": mz_j, "intensity": inten, "gap": round(ad, 5),
                         "direction": "up" if up else "down", "candidates": cands})
     out.sort(key=lambda r: (r["direction"] != "up", r["gap"]))
@@ -300,12 +371,12 @@ def neighbours(peaks, i, class_name="standard", charge=1, include=None, exclude=
             "custom": custom_residues(custom, class_name, include, exclude)}
 
 
-def _edges(peaks, alphabet, z, limit):
-    """Every residue-sized gap between two peaks: {a: [(b, gap, [(label, mass) closest first])]}."""
-    ms = sorted(((l, m) for l, m in alphabet.items() if m >= MIN_RES), key=lambda kv: kv[1])
+def _edges(peaks, alphabet, z, limit, doubles=False):
+    """Every residue-sized gap between two peaks: {a: [(b, gap, [candidates, singles first])]}."""
+    ms = {l: m for l, m in alphabet.items() if m >= MIN_RES}
     if not ms:
         raise AnnotateError(f"no residue at or above {MIN_RES:.0f} Da")
-    vals = [m for _l, m in ms]
+    fit = _Fit(ms, peaks, z, limit, doubles)
     # the widest window any pair can have, so the sweep can stop early
     reach = limit.window(max(p[0] for p in peaks), z) if peaks else 0.0
     out = {}
@@ -313,42 +384,41 @@ def _edges(peaks, alphabet, z, limit):
         row = []
         for b in range(a + 1, len(peaks)):
             d = (peaks[b][0] - peaks[a][0]) * z
-            if d < vals[0] - reach:
+            if d < fit.lowest - reach:
                 continue
-            if d > vals[-1] + reach:
+            if d > fit.highest + reach:
                 break
-            t = limit.window(peaks[b][0], z)
-            k = bisect.bisect_left(vals, d - t)
-            hits = []
-            while k < len(vals) and vals[k] <= d + t:
-                hits.append(ms[k])
-                k += 1
+            hits = fit.fits(d, peaks[b][0], peaks[a][0])
             if hits:
-                hits.sort(key=lambda h: abs(h[1] - d))
                 row.append((b, d, hits))
         if row:
             out[a] = row
     return out
 
 
-def _paths(peaks, i, j, alphabet, z, max_paths, max_steps, limit):
-    """Every way from peak i to peak j in residue-sized steps, fewest steps first."""
+def _paths(peaks, i, j, alphabet, z, max_paths, max_steps, limit, doubles=False):
+    """Every way from peak i to peak j in residue-sized steps, fewest residues first.
+
+    A two-residue jump counts as two residues, and of two chains with as many residues the one with
+    fewer jumps comes first, so a chain of single residues is always preferred.
+    """
     if i == j:
         return []
     if peaks[i][0] > peaks[j][0]:
         i, j = j, i
-    edges = _edges(peaks, alphabet, z, limit)
+    edges = _edges(peaks, alphabet, z, limit, doubles)
     found = []
 
     def walk(at, path, gaps, inten):
         if len(found) >= max_paths * 20 or len(gaps) > max_steps:
             return
         if at == j:
+            jumps = sum(1 for g in gaps if g[1][0].get("double"))
             found.append({"nodes": list(path), "gaps": list(gaps),
-                          "labels": [g[1][0][0] for g in gaps],
-                          "alternatives": [[_candidate(l, m, d, top, z) for l, m in h]
-                                           for d, h, top in gaps],
-                          "steps": len(gaps), "intensity": inten})
+                          "labels": [g[1][0]["label"] for g in gaps],
+                          "alternatives": [list(h) for _d, h, _top in gaps],
+                          "steps": len(gaps), "residues": len(gaps) + jumps,
+                          "jumps": jumps, "intensity": inten})
             return
         for b, d, hits in edges.get(at, ()):
             if peaks[b][0] > peaks[j][0]:
@@ -360,20 +430,21 @@ def _paths(peaks, i, j, alphabet, z, max_paths, max_steps, limit):
             gaps.pop()
 
     walk(i, [i], [], peaks[i][1])
-    found.sort(key=lambda p: (p["steps"], -p["intensity"]))
+    found.sort(key=lambda p: (p["residues"], p["jumps"], -p["intensity"]))
     return found[:max_paths]
 
 
 def connect(peaks, i, j, class_name="standard", charge=1, max_paths=50, max_steps=12,
-            include=None, exclude=None, custom=None, tolerance=None):
-    """Two distant peaks -> the chains of residues that span them, fewest steps first."""
+            include=None, exclude=None, custom=None, tolerance=None, doubles=False):
+    """Two distant peaks -> the chains of residues that span them, fewest residues first."""
     _check_index(peaks, i, j)
     a = alphabet_for(class_name, include, exclude, custom)
-    paths = _paths(peaks, i, j, a, charge, max_paths, max_steps, error_limit(tolerance))
+    paths = _paths(peaks, i, j, a, charge, max_paths, max_steps, error_limit(tolerance), doubles)
     return {"class": class_name, "charge": charge, "alphabet_size": len(a),
             "custom": custom_residues(custom, class_name, include, exclude),
             "n_paths": len(paths),
-            "paths": [{"steps": p["steps"], "labels": p["labels"], "nodes": p["nodes"],
+            "paths": [{"steps": p["steps"], "jumps": p["jumps"], "labels": p["labels"],
+                       "nodes": p["nodes"],
                        "intensity": round(p["intensity"], 2),
                        "gaps": [{"gap": round(d, 5), "candidates": alts}
                                 for (d, _h, _top), alts in zip(p["gaps"], p["alternatives"])]}
@@ -476,15 +547,14 @@ _READINGS = [("cyclic b-ion to [M+H]+", 0.0), ("linear b-ion to [M+H]+", H2O),
 
 def precursor_neighbours(peaks, precursor_mz, precursor_charge=1, class_name="standard",
                          charge=1, include=None, exclude=None, custom=None, topology=None,
-                         tolerance=None):
+                         tolerance=None, doubles=False):
     """Every peak one residue below the precursor, under each reading of what the precursor is."""
     if not peaks:
         raise AnnotateError("there are no peaks")
     a = alphabet_for(class_name, include, exclude, custom)
     pre = precursor_point(precursor_mz, precursor_charge)
     limit = error_limit(tolerance)
-    items = sorted(a.items(), key=lambda kv: kv[1])
-    vals = [m for _l, m in items]
+    fit = _Fit(a, peaks, charge, limit, doubles)
     readings = list(_READINGS)
     if topology == "cyclic":
         readings = [readings[0], readings[2], readings[1]]
@@ -493,7 +563,6 @@ def precursor_neighbours(peaks, precursor_mz, precursor_charge=1, class_name="st
     elif topology is not None:
         raise AnnotateError("topology must be cyclic, linear or left out")
     # the precursor is the heavier end of every one of these distances
-    tt = limit.window(pre["mh1"], charge)
     out = []
     for i, p in enumerate(peaks):
         mz = float(p[0])
@@ -502,14 +571,8 @@ def precursor_neighbours(peaks, precursor_mz, precursor_charge=1, class_name="st
             d = raw - off
             if d < MIN_RES:
                 continue
-            k = bisect.bisect_left(vals, d - tt)
-            cands = []
-            while k < len(vals) and vals[k] <= d + tt:
-                cands.append(_candidate(items[k][0], items[k][1], d, pre["mh1"], charge,
-                                        ppm_digits=2))
-                k += 1
+            cands = fit.fits(d, pre["mh1"], mz, ppm_digits=2)
             if cands:
-                cands.sort(key=lambda c: abs(c["error_mda"]))
                 out.append({"peak": i, "peak_mz": round(mz, 5), "hypothesis": name,
                             "offset": round(off, 5), "distance": round(d, 5),
                             "candidates": cands})

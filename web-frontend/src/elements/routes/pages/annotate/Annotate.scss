@@ -151,8 +151,25 @@ $muted: #586071;
   margin-bottom: 4px;
 }
 
-.annotate-legend {
+.annotate-plot-key {
   margin-right: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+}
+
+.annotate-plot-switches {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+
+  .ant-checkbox-wrapper {
+    font-size: 12px;
+  }
+}
+
+.annotate-legend {
   font-size: 12px;
   color: $muted;
 

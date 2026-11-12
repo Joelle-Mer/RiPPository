@@ -239,6 +239,9 @@ function runVerdict(comparison: KnownComparison) {
     : 'These steps are not a contiguous run of the structure.';
 }
 
+// the best reading is a two-residue jump only when no single residue fits
+const isJump = (candidates: Candidate[]) => candidates[0]?.double === true;
+
 function residueList(candidates: Candidate[]) {
   return candidates.map((c) => c.label).join(' / ');
 }
@@ -326,6 +329,7 @@ export {
   movedChain,
   precursorLinks,
   precursorNeighbours,
+  isJump,
   residueList,
   runVerdict,
   safeFileName,

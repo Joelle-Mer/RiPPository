@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   gapMassLabel,
   gapOnlyMarks,
+  isJump,
   chainMarks,
   feedbackLinks,
   chainPath,
@@ -332,5 +333,25 @@ describe('gaps no residue fits', () => {
     expect(savedSummary(chain)).toBe('Gly');
     expect(savedSummary(chain, true)).toBe('Gly, 123.4567 Da');
     expect(gapMassLabel(123.45671)).toBe('123.4567 Da');
+  });
+});
+
+describe('isJump', () => {
+  const single = { label: 'Asn', mass: 114.04, error_mda: 0.1 };
+  const jump = {
+    label: 'Gly+Gly',
+    mass: 114.04,
+    error_mda: 0.1,
+    double: true,
+    parts: [
+      { label: 'Gly', mass: 57.02 },
+      { label: 'Gly', mass: 57.02 },
+    ],
+  };
+  it('is a jump only when no single residue comes first', () => {
+    expect(isJump([jump])).toBe(true);
+    expect(isJump([single, jump])).toBe(false);
+    expect(isJump([single])).toBe(false);
+    expect(isJump([])).toBe(false);
   });
 });

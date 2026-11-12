@@ -58,6 +58,8 @@ class Query(BaseModel):
     exclude: list[str] = Field(default_factory=list, max_length=200)
     custom: list[dict] = Field(default_factory=list, max_length=50)
     tolerance: dict | None = None
+    # also read a gap as two residues where the fragment between them is missing
+    doubles: bool = False
 
     @field_validator("peaks")
     @classmethod
@@ -74,7 +76,8 @@ class Query(BaseModel):
         if unknown:
             raise HTTPException(422, f"unknown residue labels: {unknown}")
         return {"class_name": self.class_name, "charge": self.charge, "include": self.include,
-                "exclude": self.exclude, "custom": self.custom, "tolerance": self.tolerance}
+                "exclude": self.exclude, "custom": self.custom, "tolerance": self.tolerance,
+                "doubles": self.doubles}
 
 
 class Pair(Query):

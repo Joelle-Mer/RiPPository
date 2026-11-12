@@ -8,7 +8,7 @@ import {
   useState,
 } from 'react';
 import { scaleLinear } from 'd3';
-import { Button } from 'antd';
+import { Button, Checkbox } from 'antd';
 import {
   Candidate,
   Neighbour,
@@ -22,6 +22,7 @@ import {
   formatMz,
   gapMassLabel,
   gapOnlyMarks,
+  isJump,
   markLanes,
   residueList,
 } from './annotateFormat';
@@ -42,6 +43,8 @@ const colors = {
   peak: '#8a94a6',
   picked: 'rgb(5, 109, 220)',
   neighbour: '#c2570c',
+  // reached by two residues across a missing fragment
+  jump: '#be185d',
   highlight: '#0f766e',
   unmatched: '#6b7280',
   precursor: '#7c3aed',
@@ -75,6 +78,10 @@ type InputProps = {
   onSaveChain: (() => void) | null;
   // label a gap no residue fits with its mass, instead of "no single residue"
   gapMass: boolean;
+  onGapMassChange: (on: boolean) => void;
+  // also read gaps as two residues across a missing fragment
+  doubles: boolean;
+  onDoublesChange: (on: boolean) => void;
   onRemoveSaved: (id: number) => void;
 };
 
@@ -93,6 +100,9 @@ function AnnotateSpectrum({
   onAddPeaks,
   onSaveChain,
   gapMass,
+  onGapMassChange,
+  doubles,
+  onDoublesChange,
   onRemoveSaved,
 }: InputProps) {
   const errorUnit = useErrorUnit();
@@ -422,7 +432,9 @@ function AnnotateSpectrum({
       : lit
         ? colors.highlight
         : near
-          ? colors.neighbour
+          ? isJump(neighbourMap.get(i)?.candidates ?? [])
+            ? colors.jump
+            : colors.neighbour
           : (savedColor.get(i) ??
             (isPrecursor ? colors.precursor : colors.peak));
     return (
@@ -463,6 +475,9 @@ function AnnotateSpectrum({
           placed.push(x);
         }
         const label = neighbourMap.get(i)?.candidates[0].label ?? '';
+        const tint = isJump(neighbourMap.get(i)?.candidates ?? [])
+          ? colors.jump
+          : colors.neighbour;
         const reach = fits ? labelLift + label.length * 6.6 + 4 : 11;
         targets.push({
           peak: i,
@@ -475,7 +490,7 @@ function AnnotateSpectrum({
           <g key={'mark-' + i}>
             <path
               d={`M ${x - 4} ${top - 9} L ${x + 4} ${top - 9} L ${x} ${top - 2} Z`}
-              fill={colors.neighbour}
+              fill={tint}
             />
             {fits && (
               <text
@@ -483,7 +498,7 @@ function AnnotateSpectrum({
                 fontSize={12}
                 fontFamily={font}
                 fontWeight={i === hover ? 'bold' : undefined}
-                fill={colors.neighbour}
+                fill={tint}
               >
                 {label}
               </text>
@@ -582,7 +597,9 @@ function AnnotateSpectrum({
     const color = span.toPrecursor
       ? colors.precursor
       : matched
-        ? colors.picked
+        ? isJump(span.candidates)
+          ? colors.jump
+          : colors.picked
         : colors.unmatched;
     const label = matched
       ? `${residueList(span.candidates)} ${formatError(span.candidates[0], errorUnit, 1)}`
@@ -701,10 +718,13 @@ function AnnotateSpectrum({
                 fill="none"
                 stroke={chain.color}
                 strokeWidth={1.4}
+                // a saved two-residue jump keeps its chain's colour, dotted
                 strokeDasharray={
                   mark.toPrecursor || mark.candidates.length === 0
                     ? '4 3'
-                    : undefined
+                    : isJump(mark.candidates)
+                      ? '1.5 2.5'
+                      : undefined
                 }
               />
               {shown && (
@@ -733,16 +753,38 @@ function AnnotateSpectrum({
   return (
     <div className="annotate-plot" ref={frameRef}>
       <div className="annotate-plot-tools">
-        <span className="annotate-legend">
-          <i style={{ background: colors.picked }} /> your peaks
-          <i style={{ background: colors.neighbour }} /> one residue from the
-          last peak you picked
-          {precursor >= 0 && (
-            <>
-              <i className="annotate-legend-dashed" /> precursor
-            </>
-          )}
-        </span>
+        <div className="annotate-plot-key">
+          <span className="annotate-legend">
+            <i style={{ background: colors.picked }} /> your peaks
+            <i style={{ background: colors.neighbour }} /> one residue from the
+            last peak you picked
+            {doubles && (
+              <>
+                <i style={{ background: colors.jump }} /> two residues, the
+                peak between missing
+              </>
+            )}
+            {precursor >= 0 && (
+              <>
+                <i className="annotate-legend-dashed" /> precursor
+              </>
+            )}
+          </span>
+          <span className="annotate-plot-switches">
+            <Checkbox
+              checked={gapMass}
+              onChange={(event) => onGapMassChange(event.target.checked)}
+            >
+              Mass of gaps with no residue
+            </Checkbox>
+            <Checkbox
+              checked={doubles}
+              onChange={(event) => onDoublesChange(event.target.checked)}
+            >
+              Two-residue jumps
+            </Checkbox>
+          </span>
+        </div>
         {onSaveChain && (
           <Button size="small" type="primary" onClick={onSaveChain}>
             Save chain
