@@ -23,6 +23,11 @@ MAX_CHARGE = 3
 RIPPOSITORY_API = os.environ.get("RIPPOSITORY_API",
                                  "https://rippository.bioinformatics.nl/api").rstrip("/")
 ACCESSION = re.compile(r"[A-Z0-9-]{3,40}")
+# the site's own spectral search (similarity-service), which scores every record by modified cosine
+SIMILARITY_URL = os.environ.get("SIMILARITY_SERVICE_URL",
+                                "https://rippository.bioinformatics.nl/similarity").rstrip("/")
+SIMILAR_SHOWN = 10        # records returned with their peaks, for the mirror plot
+PAIR_TOLERANCE = 0.1      # Da, the search's own matching tolerance
 
 app = FastAPI(title="RiPP annotator service", root_path=os.environ.get("ROOT_PATH", ""))
 
@@ -254,6 +259,82 @@ def example(accession: str):
         # the structure cut into residues ahead of time, for the comparison with saved chains
         spectrum["known"] = core.known_structure(accession)
     return found
+
+
+class SimilarQuery(BaseModel):
+    peaks: list[Peak] = Field(min_length=1, max_length=MAX_PEAKS)
+    precursor_mz: float | None = Field(default=None, gt=0, allow_inf_nan=False)
+
+
+def stored_precursor(record):
+    """The precursor m/z a record states, if it states one (MS$FOCUSED_ION: PRECURSOR_M/Z)."""
+    ions = (record.get("mass_spectrometry") or {}).get("focused_ion") or []
+    value = next((i["value"] for i in ions if i.get("subtag") in ("PRECURSOR_M/Z", "PRECURSOR_MZ")),
+                 None)
+    try:
+        return float(str(value).split()[0]) if value else None
+    except ValueError:
+        return None
+
+
+def matched_pairs(query, ref, shift):
+    """Peaks paired for the mirror plot: directly, or shifted by the precursor difference, within
+    the search's tolerance; strongest pairs first, each peak used once."""
+    options = []
+    for qi, (qmz, qint) in enumerate(query):
+        for ri, (rmz, rint) in enumerate(ref):
+            if abs(qmz - rmz) <= PAIR_TOLERANCE:
+                options.append((qint * rint, qi, ri, False))
+            elif shift is not None and abs(qmz - rmz - shift) <= PAIR_TOLERANCE:
+                options.append((qint * rint, qi, ri, True))
+    used_q, used_r, pairs = set(), set(), []
+    for _w, qi, ri, shifted in sorted(options, reverse=True):
+        if qi not in used_q and ri not in used_r:
+            used_q.add(qi)
+            used_r.add(ri)
+            pairs.append({"query_index": qi, "ref_index": ri, "shifted": shifted})
+    return pairs
+
+
+def similarity_search(peaks, precursor_mz):
+    body = {"peak_list": [{"mz": m, "intensity": i} for m, i in peaks]}
+    if precursor_mz:
+        body["precursor_mz"] = precursor_mz
+    request = urllib.request.Request(SIMILARITY_URL + "/similarity", data=json.dumps(body).encode(),
+                                     headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=60) as reply:
+            return json.load(reply).get("similarity_score_list") or []
+    except (OSError, ValueError) as err:
+        raise HTTPException(502, "the spectral search could not be reached") from err
+
+
+@app.post("/similar")
+def similar(q: SimilarQuery):
+    """The closest records in the database, from the site's own spectral search, best first, each
+    with its peaks and the peaks the two spectra share, for a mirror plot. A rank, not an identity."""
+    scores = similarity_search(q.peaks, q.precursor_mz)
+    results = []
+    for hit in scores[:SIMILAR_SHOWN]:
+        record = from_rippository(f"/records/{hit['accession']}")
+        names = (record.get("compound") or {}).get("names") or [hit["accession"]]
+        ref_peaks = [[p["mz"], p["intensity"]] for p in record["peak"]["peak"]["values"]]
+        ref_pre = stored_precursor(record)
+        if ref_pre is None:
+            derived, _problem = record_precursor(record)
+            ref_pre = derived["precursor_mz"] if derived else None
+        shift = (q.precursor_mz - ref_pre) if (q.precursor_mz and ref_pre) else None
+        pairs = matched_pairs(q.peaks, ref_peaks, shift)
+        results.append({"accession": hit["accession"], "name": names[0],
+                        "score": round(float(hit["similarity_score"]), 4),
+                        "ref_precursor": ref_pre, "ref_peaks": ref_peaks,
+                        "matched_pairs": pairs, "n_matched": len(pairs),
+                        "n_matched_shifted": sum(1 for x in pairs if x["shifted"]),
+                        "n_query_peaks": len(q.peaks),
+                        "precursor_shift": round(shift, 4) if shift is not None else None,
+                        "tolerance": PAIR_TOLERANCE})
+    return {"results": results, "n_scored": len(scores),
+            "method": "modified cosine" if q.precursor_mz else "cosine"}
 
 
 @app.post("/gap")

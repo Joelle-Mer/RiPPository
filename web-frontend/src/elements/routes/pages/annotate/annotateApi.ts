@@ -7,8 +7,10 @@ import {
   GapResult,
   KnownComparison,
   KnownStructure,
+  SimilarResult,
   Meta,
   Neighbour,
+  PeakPair,
   PeakLink,
   PrecursorGaps,
   Query,
@@ -89,6 +91,11 @@ function annotateClient(baseUrl: string) {
         { ...q, precursor_index, precursor_mz, precursor_charge },
         signal,
       ),
+    similar: (
+      peaks: PeakPair[],
+      precursor_mz: number | null,
+      signal?: AbortSignal,
+    ) => post<SimilarResult>('/similar', { peaks, precursor_mz }, signal),
     compareKnown: (
       chain: SavedChain,
       known: KnownStructure,

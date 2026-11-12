@@ -90,6 +90,8 @@ services:
     environment:
       # the examples on the annotator page are read from the site's own API
       RIPPOSITORY_API: "http://mb3server:8080${MB3_API_BASE_URL}"
+      # the closest-spectra panel asks the site's own spectral search
+      SIMILARITY_SERVICE_URL: "http://similarity-service:8080${SIMILARITY_SERVICE_BASE_URL}"
     ports:
       - "${ANNOTATOR_SERVICE_PORT:-4148}:8080"
 

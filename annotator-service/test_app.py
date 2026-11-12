@@ -109,8 +109,9 @@ def test_links_keep_every_matching_pair_not_only_neighbours():
 
 
 def test_a_bad_tolerance_is_refused_with_a_reason():
-    r = client.post("/gap", json={"peaks": PEAKS, "i": 0, "j": 1, "tolerance": {"ppm": 0}})
-    assert r.status_code == 422 and "ppm" in r.json()["detail"]
+    r = client.post("/gap", json={"peaks": PEAKS, "i": 0, "j": 1,
+                                  "tolerance": {"unit": "ppm", "value": 0}})
+    assert r.status_code == 422 and "greater than 0" in r.json()["detail"]
 
 
 RECORD = {"accession": "RIPPOS-LU-0006",
@@ -281,7 +282,7 @@ def test_tolerance_is_applied_inside_the_chain_search():
              [200.0 + _a["Gly"] + _a["Ala"] + 0.003, 10.0]]
     loose = client.post("/connect", json={"peaks": peaks, "i": 0, "j": 2}).json()
     tight = client.post("/connect", json={"peaks": peaks, "i": 0, "j": 2,
-                                          "tolerance": {"ppm": 1, "floor_mda": 0.5}}).json()
+                                          "tolerance": {"unit": "mDa", "value": 0.5}}).json()
     assert ["Gly", "Ala"] in [p["labels"] for p in loose["paths"]]
     assert ["Gly", "Ala"] not in [p["labels"] for p in tight["paths"]]
 
@@ -309,7 +310,7 @@ def test_a_record_without_a_structure_loads_without_one(monkeypatch):
 
 
 def test_no_endpoint_left_over_from_the_removed_panels():
-    for path in ("/read", "/spectrum-null", "/bridges", "/similar"):
+    for path in ("/read", "/spectrum-null", "/bridges"):
         assert client.post(path, json={}).status_code == 404
 
 
@@ -321,3 +322,102 @@ def test_leu_is_called_leu_ile_everywhere():
     mod = {"name": "m", "delta": 14.01565, "applies_to": ["Leu/Ile"]}
     made = client.post("/custom-residues", json={"custom": [mod]}).json()
     assert made[0]["label"] == "Leu/Ile[m]"
+
+
+def test_the_old_tolerance_form_is_refused():
+    r = client.post("/gap", json={"peaks": PEAKS, "i": 0, "j": 1,
+                                  "tolerance": {"ppm": 10, "floor_mda": 5}})
+    assert r.status_code == 422
+
+
+@pytest.mark.parametrize("limit", [{"unit": "mDa", "value": 2}, {"unit": "mDa", "value": 10},
+                                   {"unit": "ppm", "value": 5}, {"unit": "ppm", "value": 20}])
+def test_no_shown_error_exceeds_the_limit(limit):
+    # peaks with gaps a little off real residues, at low and high m/z, read at charge 1 and 2
+    import random
+    rng = random.Random(7)
+    masses = list(_a.values())
+    for charge in (1, 2):
+        mz = [150.0]
+        for _ in range(25):
+            mz.append(mz[-1] + rng.choice(masses) / charge + rng.uniform(-0.02, 0.02))
+        peaks = [[round(m, 5), 10.0] for m in mz]
+        key = "error_mda" if limit["unit"] == "mDa" else "error_ppm"
+        seen = 0
+        for i in range(len(peaks)):
+            n = client.post("/neighbours", json={"peaks": peaks, "i": i, "charge": charge,
+                                                 "tolerance": limit}).json()["neighbours"]
+            for x in n:
+                for c in x["candidates"]:
+                    seen += 1
+                    assert abs(c[key]) <= limit["value"] + 0.051, (limit, c)
+        for i in range(0, len(peaks) - 1, 3):
+            g = client.post("/gap", json={"peaks": peaks, "i": i, "j": i + 1, "charge": charge,
+                                          "tolerance": limit}).json()
+            for c in g["candidates"]:
+                assert abs(c[key]) <= limit["value"] + 0.051, (limit, c)
+        assert seen > 0, "the check saw no matches, so it tested nothing"
+
+
+def test_ppm_is_of_the_heavier_peak():
+    # Gly 3 mDa off between m/z 500 and 557: 3 mDa of 557.02 is 5.4 ppm, of Gly's 57 Da it would be 53
+    peaks = [[500.0, 10.0], [500.0 + _a["Gly"] + 0.003, 10.0]]
+    c = client.post("/gap", json={"peaks": peaks, "i": 0, "j": 1}).json()["candidates"][0]
+    assert c["label"] == "Gly" and abs(c["error_ppm"] - 5.4) < 0.1
+    # and a 5 ppm limit leaves it out, a 6 ppm one keeps it
+    out = client.post("/gap", json={"peaks": peaks, "i": 0, "j": 1,
+                                    "tolerance": {"unit": "ppm", "value": 5}}).json()
+    kept = client.post("/gap", json={"peaks": peaks, "i": 0, "j": 1,
+                                     "tolerance": {"unit": "ppm", "value": 6}}).json()
+    assert out["candidates"] == [] and kept["candidates"][0]["label"] == "Gly"
+
+
+def _record(accession, peaks, stated=None, mass=75.032, formula="C2H5NO2"):
+    ions = [{"subtag": "PRECURSOR_TYPE", "value": "[M+H]+"}]
+    if stated:
+        ions.append({"subtag": "PRECURSOR_M/Z", "value": str(stated)})
+    return {"accession": accession, "compound": {"names": [accession + " name"], "mass": mass,
+                                                 "formula": formula},
+            "mass_spectrometry": {"focused_ion": ions},
+            "peak": {"peak": {"values": [{"mz": m, "intensity": i} for m, i in peaks]}}}
+
+
+QUERY = [[100.0, 50.0], [150.0, 100.0], [200.0, 30.0]]
+
+
+def test_similar_takes_the_scores_from_the_sites_search(monkeypatch):
+    asked = {}
+
+    def search(peaks, precursor):
+        asked["precursor"] = precursor
+        return [{"accession": "A-SAME", "similarity_score": 0.97},
+                {"accession": "B-SHIFT", "similarity_score": 0.5}]
+    library = {"A-SAME": _record("A-SAME", QUERY, stated=300.0),
+               "B-SHIFT": _record("B-SHIFT", [[100.0, 50.0], [164.0, 100.0]], stated=314.0)}
+    monkeypatch.setattr(service, "similarity_search", search)
+    monkeypatch.setattr(service, "from_rippository", lambda path: library[path.rsplit("/", 1)[1]])
+    r = client.post("/similar", json={"peaks": QUERY, "precursor_mz": 300.0}).json()
+    assert asked["precursor"] == 300.0 and r["method"] == "modified cosine"
+    assert [x["accession"] for x in r["results"]] == ["A-SAME", "B-SHIFT"]
+    same, shifted = r["results"]
+    assert same["score"] == 0.97 and same["n_matched"] == 3 and same["n_matched_shifted"] == 0
+    # 150 pairs with 164 only through the 14 Da precursor difference; 100 pairs directly
+    assert shifted["precursor_shift"] == -14.0
+    assert shifted["n_matched"] == 2 and shifted["n_matched_shifted"] == 1
+
+
+def test_similar_without_a_precursor_uses_plain_cosine(monkeypatch):
+    monkeypatch.setattr(service, "similarity_search", lambda peaks, pre: [])
+    r = client.post("/similar", json={"peaks": QUERY}).json()
+    assert r == {"results": [], "n_scored": 0, "method": "cosine"}
+
+
+def test_an_unreachable_search_is_explained(monkeypatch):
+    monkeypatch.setattr(service, "SIMILARITY_URL", "http://127.0.0.1:9")
+    r = client.post("/similar", json={"peaks": QUERY, "precursor_mz": 300.0})
+    assert r.status_code == 502 and "could not be reached" in r.json()["detail"]
+
+
+def test_each_peak_is_paired_once():
+    pairs = service.matched_pairs([[100.0, 1.0], [100.05, 1.0]], [[100.02, 1.0]], None)
+    assert len(pairs) == 1

@@ -5,8 +5,9 @@ and the modifications each RiPP class or kind of modification adds) are data, re
 data/residues.json. Structures of database records, cut into residues, are in
 data/known_structures.json.
 
-Tolerance: each peak gets max(floor, m/z x ppm); a gap's window is the sum for its two peaks,
-times the charge of the series being read.
+Error limit: one limit, in mDa or in ppm. A residue fits a gap only if its error is within the
+limit, so no match shown ever exceeds it. ppm is of the heavier peak's m/z (of the precursor, for a
+distance to the precursor), the way an instrument's accuracy is stated.
 """
 from __future__ import annotations
 
@@ -26,9 +27,13 @@ OFFERED: dict[str, dict[str, dict[str, float]]] = _TABLES["offered"]
 VOCAB: dict[str, float] = _TABLES["vocab"]
 CLASSES: list[dict] = _TABLES["classes"]
 MIN_RES: float = _TABLES["min_residue"]
-PPM: float = _TABLES["tolerance"]["ppm"]
-FLOOR_DA: float = _TABLES["tolerance"]["floor_mda"] / 1000.0
-TOLERANCE = dict(_TABLES["tolerance"])
+DEFAULT_LIMIT = {"unit": "mDa", "value": 10.0}
+TOLERANCE = {
+    "default": DEFAULT_LIMIT,
+    "defaults": {"mDa": 10.0, "ppm": 10.0},
+    "rule": "a residue is shown only if its error is within your limit: in mDa, or in ppm of "
+            "the heavier peak's m/z",
+}
 
 PROTON = 1.00727646
 H_ATOM = 1.0078250319
@@ -38,51 +43,56 @@ CUSTOM_MAX = 50
 ALPHABET_MAX = 300
 NAME_MAX = 32
 SETS_MAX = 12
-PPM_MAX = 10000.0
-FLOOR_MDA_MAX = 1000.0
+LIMIT_MAX = {"mDa": 1000.0, "ppm": 10000.0}
 
 
 class AnnotateError(ValueError):
     """A request that cannot be answered, with a message meant for the person using the page."""
 
 
-# --- tolerance ------------------------------------------------------------------------------------
+# --- the error limit -----------------------------------------------------------------------------
 
-def make_tol(ppm=None, floor_mda=None):
-    p = PPM if ppm is None else float(ppm)
-    f = FLOOR_DA if floor_mda is None else float(floor_mda) / 1000.0
-    return lambda mz: max(f, mz * p / 1e6)
+class Limit:
+    """The largest error allowed on a match, and how to state an error in ppm."""
+
+    def __init__(self, unit, value):
+        self.unit, self.value = unit, value
+
+    def window(self, ref_mz, charge=1):
+        """Largest allowed |error| in Da on a gap read at `charge`, whose heavier end is `ref_mz`."""
+        if self.unit == "mDa":
+            return self.value / 1000.0
+        return self.value * charge * ref_mz / 1e6
+
+    def describe(self):
+        return f"{self.value:g} {self.unit}"
 
 
-DEFAULT_TOL = make_tol()
+def ppm_of(error_da, ref_mz, charge=1):
+    """An error in Da on a gap, as ppm of the heavier peak's m/z."""
+    return (error_da / charge) / ref_mz * 1e6 if ref_mz else None
 
 
-def tolerance_function(tolerance):
-    """{"ppm": 5, "floor_mda": 2} (either key alone is fine) -> a per-peak tolerance function."""
+def error_limit(tolerance):
+    """{"unit": "mDa" | "ppm", "value": 10} -> a Limit; None gives the default."""
     if tolerance in (None, {}):
-        return DEFAULT_TOL
-    if not isinstance(tolerance, dict):
-        raise AnnotateError('tolerance must be an object like {"ppm": 5, "floor_mda": 2}')
-    unknown = set(tolerance) - {"ppm", "floor_mda"}
-    if unknown:
-        raise AnnotateError(f"unknown tolerance keys: {', '.join(sorted(unknown))}")
-    ppm, floor = tolerance.get("ppm"), tolerance.get("floor_mda")
-    if ppm is None and floor is None:
-        raise AnnotateError("tolerance needs ppm, floor_mda, or both")
-    for name, v, hi in (("ppm", ppm, PPM_MAX), ("floor_mda", floor, FLOOR_MDA_MAX)):
-        if v is None:
-            continue
-        try:
-            v = float(v)
-        except (TypeError, ValueError):
-            raise AnnotateError(f"tolerance {name} is not a number")
-        if v != v or v in (float("inf"), float("-inf")):
-            raise AnnotateError(f"tolerance {name} must be finite")
-        if v <= 0:
-            raise AnnotateError(f"tolerance {name} must be greater than 0")
-        if v > hi:
-            raise AnnotateError(f"tolerance {name} of {v:g} is too wide to mean anything")
-    return make_tol(ppm, floor)
+        return Limit(DEFAULT_LIMIT["unit"], DEFAULT_LIMIT["value"])
+    if not isinstance(tolerance, dict) or set(tolerance) - {"unit", "value"}:
+        raise AnnotateError('the error limit must look like {"unit": "mDa", "value": 10}')
+    unit = tolerance.get("unit")
+    if unit not in LIMIT_MAX:
+        raise AnnotateError("the error limit's unit must be mDa or ppm")
+    try:
+        value = float(tolerance.get("value"))
+    except (TypeError, ValueError):
+        raise AnnotateError("the error limit is not a number")
+    if value != value or value in (float("inf"), float("-inf")):
+        raise AnnotateError("the error limit must be finite")
+    if value <= 0:
+        raise AnnotateError("the error limit must be greater than 0")
+    if value > LIMIT_MAX[unit]:
+        raise AnnotateError(f"an error limit of {value:g} {unit} is too wide to mean anything")
+    return Limit(unit, value)
 
 
 # --- residue sets ---------------------------------------------------------------------------------
@@ -229,9 +239,11 @@ def _check_index(peaks, *idx):
             raise AnnotateError(f"peak {i!r} is not in this spectrum, which has {n} peaks")
 
 
-def _candidate(label, mass, d, ppm_digits=1):
+def _candidate(label, mass, d, ref_mz, charge=1, ppm_digits=1):
+    """A residue that fits a gap, with its error in mDa and in ppm of the heavier peak's m/z."""
+    ppm = ppm_of(d - mass, ref_mz, charge)
     return {"label": label, "mass": round(mass, 5), "error_mda": round((d - mass) * 1000, 2),
-            "error_ppm": round((d - mass) / mass * 1e6, ppm_digits) if mass else None}
+            "error_ppm": round(ppm, ppm_digits) if ppm is not None else None}
 
 
 def gap(peaks, i, j, class_name="standard", charge=1, include=None, exclude=None,
@@ -239,11 +251,11 @@ def gap(peaks, i, j, class_name="standard", charge=1, include=None, exclude=None
     """Two peaks -> every residue that fits the difference, closest first, with its error."""
     _check_index(peaks, i, j)
     a = alphabet_for(class_name, include, exclude, custom)
-    tol = tolerance_function(tolerance)
+    limit = error_limit(tolerance)
     mz_i, mz_j = sorted((peaks[i][0], peaks[j][0]))
     d = (mz_j - mz_i) * charge
-    t = (tol(mz_i) + tol(mz_j)) * charge
-    cands = [_candidate(lab, m, d) for lab, m in sorted(a.items(), key=lambda kv: kv[1])
+    t = limit.window(mz_j, charge)
+    cands = [_candidate(lab, m, d, mz_j, charge) for lab, m in sorted(a.items(), key=lambda kv: kv[1])
              if abs(m - d) <= t]
     cands.sort(key=lambda c: abs(c["error_mda"]))
     return {"gap": round(d, 5), "tol": round(t, 5), "charge": charge, "candidates": cands,
@@ -256,10 +268,9 @@ def neighbours(peaks, i, class_name="standard", charge=1, include=None, exclude=
     """Every peak one residue away from peak i."""
     _check_index(peaks, i)
     a = alphabet_for(class_name, include, exclude, custom)
-    tol = tolerance_function(tolerance)
+    limit = error_limit(tolerance)
     items = sorted(a.items(), key=lambda kv: kv[1])
     vals = [m for _l, m in items]
-    lo, hi = vals[0] - 0.06, vals[-1] + 0.06
     mz_i = peaks[i][0]
     out = []
     for j, (mz_j, inten) in enumerate(peaks):
@@ -270,13 +281,14 @@ def neighbours(peaks, i, class_name="standard", charge=1, include=None, exclude=
         if (direction == "up" and not up) or (direction == "down" and up):
             continue
         ad = abs(d)
-        if ad < lo or ad > hi:
+        heavier = max(mz_i, mz_j)
+        t = limit.window(heavier, charge)
+        if ad < vals[0] - t or ad > vals[-1] + t:
             continue
-        t = (tol(mz_i) + tol(mz_j)) * charge
         k = bisect.bisect_left(vals, ad - t)
         cands = []
         while k < len(vals) and vals[k] <= ad + t:
-            cands.append(_candidate(items[k][0], items[k][1], ad))
+            cands.append(_candidate(items[k][0], items[k][1], ad, heavier, charge))
             k += 1
         if cands:
             cands.sort(key=lambda c: abs(c["error_mda"]))
@@ -288,23 +300,24 @@ def neighbours(peaks, i, class_name="standard", charge=1, include=None, exclude=
             "custom": custom_residues(custom, class_name, include, exclude)}
 
 
-def _edges(peaks, alphabet, z, tol):
+def _edges(peaks, alphabet, z, limit):
     """Every residue-sized gap between two peaks: {a: [(b, gap, [(label, mass) closest first])]}."""
     ms = sorted(((l, m) for l, m in alphabet.items() if m >= MIN_RES), key=lambda kv: kv[1])
     if not ms:
         raise AnnotateError(f"no residue at or above {MIN_RES:.0f} Da")
     vals = [m for _l, m in ms]
-    lo, hi = vals[0] - 0.06, vals[-1] + 0.06
+    # the widest window any pair can have, so the sweep can stop early
+    reach = limit.window(max(p[0] for p in peaks), z) if peaks else 0.0
     out = {}
     for a in range(len(peaks)):
         row = []
         for b in range(a + 1, len(peaks)):
             d = (peaks[b][0] - peaks[a][0]) * z
-            if d < lo:
+            if d < vals[0] - reach:
                 continue
-            if d > hi:
+            if d > vals[-1] + reach:
                 break
-            t = (tol(peaks[a][0]) + tol(peaks[b][0])) * z
+            t = limit.window(peaks[b][0], z)
             k = bisect.bisect_left(vals, d - t)
             hits = []
             while k < len(vals) and vals[k] <= d + t:
@@ -318,13 +331,13 @@ def _edges(peaks, alphabet, z, tol):
     return out
 
 
-def _paths(peaks, i, j, alphabet, z, max_paths, max_steps, tol):
+def _paths(peaks, i, j, alphabet, z, max_paths, max_steps, limit):
     """Every way from peak i to peak j in residue-sized steps, fewest steps first."""
     if i == j:
         return []
     if peaks[i][0] > peaks[j][0]:
         i, j = j, i
-    edges = _edges(peaks, alphabet, z, tol)
+    edges = _edges(peaks, alphabet, z, limit)
     found = []
 
     def walk(at, path, gaps, inten):
@@ -333,16 +346,15 @@ def _paths(peaks, i, j, alphabet, z, max_paths, max_steps, tol):
         if at == j:
             found.append({"nodes": list(path), "gaps": list(gaps),
                           "labels": [g[1][0][0] for g in gaps],
-                          "alternatives": [[{"label": l, "mass": round(m, 5),
-                                             "error_mda": round((d - m) * 1000, 2)}
-                                            for l, m in h] for d, h in gaps],
+                          "alternatives": [[_candidate(l, m, d, top, z) for l, m in h]
+                                           for d, h, top in gaps],
                           "steps": len(gaps), "intensity": inten})
             return
         for b, d, hits in edges.get(at, ()):
             if peaks[b][0] > peaks[j][0]:
                 break
             path.append(b)
-            gaps.append((d, hits))
+            gaps.append((d, hits, peaks[b][0]))
             walk(b, path, gaps, inten + peaks[b][1])
             path.pop()
             gaps.pop()
@@ -352,35 +364,19 @@ def _paths(peaks, i, j, alphabet, z, max_paths, max_steps, tol):
     return found[:max_paths]
 
 
-def _with_ppm(cands, gap_da):
-    out = []
-    for c in cands:
-        c = dict(c)
-        m = c.get("mass")
-        if "error_ppm" not in c and m:
-            e = c.get("error_mda")
-            if e is None and gap_da is not None:
-                e = (gap_da - m) * 1000.0
-                c["error_mda"] = round(e, 2)
-            if e is not None:
-                c["error_ppm"] = round((e / 1000.0) / m * 1e6, 2)
-        out.append(c)
-    return out
-
-
 def connect(peaks, i, j, class_name="standard", charge=1, max_paths=50, max_steps=12,
             include=None, exclude=None, custom=None, tolerance=None):
     """Two distant peaks -> the chains of residues that span them, fewest steps first."""
     _check_index(peaks, i, j)
     a = alphabet_for(class_name, include, exclude, custom)
-    paths = _paths(peaks, i, j, a, charge, max_paths, max_steps, tolerance_function(tolerance))
+    paths = _paths(peaks, i, j, a, charge, max_paths, max_steps, error_limit(tolerance))
     return {"class": class_name, "charge": charge, "alphabet_size": len(a),
             "custom": custom_residues(custom, class_name, include, exclude),
             "n_paths": len(paths),
             "paths": [{"steps": p["steps"], "labels": p["labels"], "nodes": p["nodes"],
                        "intensity": round(p["intensity"], 2),
-                       "gaps": [{"gap": round(d, 5), "candidates": _with_ppm(alts, d)}
-                                for (d, _h), alts in zip(p["gaps"], p["alternatives"])]}
+                       "gaps": [{"gap": round(d, 5), "candidates": alts}
+                                for (d, _h, _top), alts in zip(p["gaps"], p["alternatives"])]}
                       for p in paths]}
 
 
@@ -486,7 +482,7 @@ def precursor_neighbours(peaks, precursor_mz, precursor_charge=1, class_name="st
         raise AnnotateError("there are no peaks")
     a = alphabet_for(class_name, include, exclude, custom)
     pre = precursor_point(precursor_mz, precursor_charge)
-    tol = tolerance_function(tolerance)
+    limit = error_limit(tolerance)
     items = sorted(a.items(), key=lambda kv: kv[1])
     vals = [m for _l, m in items]
     readings = list(_READINGS)
@@ -496,12 +492,12 @@ def precursor_neighbours(peaks, precursor_mz, precursor_charge=1, class_name="st
         readings = [readings[1], readings[0], readings[2]]
     elif topology is not None:
         raise AnnotateError("topology must be cyclic, linear or left out")
-    tp = tol(pre["mh1"])
+    # the precursor is the heavier end of every one of these distances
+    tt = limit.window(pre["mh1"], charge)
     out = []
     for i, p in enumerate(peaks):
         mz = float(p[0])
         raw = (pre["mh1"] - mz) * charge
-        tt = (tol(mz) + tp) * charge
         for name, off in readings:
             d = raw - off
             if d < MIN_RES:
@@ -509,7 +505,8 @@ def precursor_neighbours(peaks, precursor_mz, precursor_charge=1, class_name="st
             k = bisect.bisect_left(vals, d - tt)
             cands = []
             while k < len(vals) and vals[k] <= d + tt:
-                cands.append(_candidate(items[k][0], items[k][1], d, ppm_digits=2))
+                cands.append(_candidate(items[k][0], items[k][1], d, pre["mh1"], charge,
+                                        ppm_digits=2))
                 k += 1
             if cands:
                 cands.sort(key=lambda c: abs(c["error_mda"]))
@@ -554,7 +551,9 @@ def compare_to_known(steps, known, tolerance=None, class_name="standard",
     if not steps:
         raise AnnotateError("the chain has no steps")
     a = alphabet_for(class_name, include, exclude, custom)
-    tol = tolerance_function(tolerance)
+    limit = error_limit(tolerance)
+    # a step against a residue of the structure: the same limit, with ppm of the residue's mass
+    tol = lambda mass: limit.window(mass) / 2
     units = known.get("unit_labels") or known.get("residues") or []
     umass = known.get("unit_mass") or []
     want = []

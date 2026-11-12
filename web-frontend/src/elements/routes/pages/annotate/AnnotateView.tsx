@@ -24,6 +24,7 @@ import { usePropertiesContext } from '../../../../context/properties/properties'
 import AnnotateAlphabet from './AnnotateAlphabet';
 import AnnotateFeedback from './AnnotateFeedback';
 import AnnotateKnown from './AnnotateKnown';
+import AnnotateSimilar from './AnnotateSimilar';
 import AnnotateSpectrum from './AnnotateSpectrum';
 import {
   NeighbourPanel,
@@ -106,7 +107,7 @@ function AnnotateView() {
   const [fileName, setFileName] = useState('');
   const [example, setExample] = useState<string | null>(null);
   // label gaps no residue fits with their mass
-  const [gapMass, setGapMass] = useState(false);
+  const [gapMass, setGapMass] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadNote, setUploadNote] = useState<string | null>(null);
   const [pasting, setPasting] = useState(false);
@@ -120,7 +121,8 @@ function AnnotateView() {
   const [include, setInclude] = useState<string[]>([]);
   const [exclude, setExclude] = useState<string[]>([]);
   const [custom, setCustom] = useState<CustomEntry[]>([]);
-  const [tolerance, setTolerance] = useState<Tolerance>({});
+  // the error limit the user typed, per unit; empty means the default for that unit
+  const [limits, setLimits] = useState<Partial<Record<ErrorUnit, number>>>({});
   const [errorUnit, setErrorUnit] = useState<ErrorUnit>('mDa');
   const [minIntensity, setMinIntensity] = useState<number | null>(null);
   const [highlight, setHighlight] = useState<number[]>([]);
@@ -157,7 +159,15 @@ function AnnotateView() {
   }, [full, minIntensity]);
   const peaks = view?.peaks;
   const precursorIndex = view?.precursorIndex ?? -1;
-  const customTolerance = Object.keys(tolerance).length > 0;
+  const customTolerance = limits[errorUnit] !== undefined;
+  const tolerance = useMemo(
+    (): Tolerance => ({
+      unit: errorUnit,
+      value:
+        limits[errorUnit] ?? meta.data?.tolerance.defaults[errorUnit] ?? 10,
+    }),
+    [errorUnit, limits, meta.data],
+  );
   const query = useMemo((): Query | null => {
     return peaks
       ? {
@@ -167,19 +177,10 @@ function AnnotateView() {
           include,
           exclude,
           custom,
-          tolerance: customTolerance ? tolerance : undefined,
+          tolerance,
         }
       : null;
-  }, [
-    charge,
-    className,
-    custom,
-    customTolerance,
-    exclude,
-    include,
-    peaks,
-    tolerance,
-  ]);
+  }, [charge, className, custom, exclude, include, peaks, tolerance]);
 
   const ordered = useMemo(() => [...picks].sort((a, b) => a - b), [picks]);
   const anchor = picks.length > 0 ? picks[picks.length - 1] : null;
@@ -251,6 +252,19 @@ function AnnotateView() {
     ],
   );
 
+  // the closest records in the database, for the measured peaks alone (the precursor point is not one)
+  const measured = useMemo(
+    () => (peaks ?? []).filter((_, i) => i !== precursorIndex),
+    [peaks, precursorIndex],
+  );
+  const similarRun = useMemo(
+    () =>
+      measured.length > 0
+        ? (s: AbortSignal) => client.similar(measured, precursorMz, s)
+        : null,
+    [client, measured, precursorMz],
+  );
+  const similar = useRequest(similarRun);
   const rawNeighbours = useRequest(neighbourRun);
   const rawSteps = useRequest(stepsRun);
   const rawChains = useRequest(chainRun);
@@ -467,19 +481,19 @@ function AnnotateView() {
     );
   }, []);
 
-  const setTolerancePart = useCallback(
-    (key: keyof Tolerance, value: number | string | null) => {
-      setTolerance((current) => {
+  const setLimit = useCallback(
+    (value: number | string | null) => {
+      setLimits((current) => {
         const next = { ...current };
         if (typeof value === 'number' && value > 0) {
-          next[key] = value;
+          next[errorUnit] = value;
         } else {
-          delete next[key];
+          delete next[errorUnit];
         }
         return next;
       });
     },
-    [],
+    [errorUnit],
   );
 
   const handleResetResidues = useCallback(() => {
@@ -515,7 +529,7 @@ function AnnotateView() {
         id,
         color: savedColors[(id - 1) % savedColors.length],
         charge,
-        tolerance: customTolerance ? tolerance : undefined,
+        tolerance,
         picks: ordered,
         // gaps no residue fits are kept too, shown while gap masses are switched on
         marks: chainMarks([
@@ -536,7 +550,6 @@ function AnnotateView() {
     setHighlight([]);
   }, [
     charge,
-    customTolerance,
     ordered,
     position,
     shownLinks,
@@ -598,7 +611,11 @@ function AnnotateView() {
 
   const handleLoadChain = useCallback((chain: SavedChain) => {
     setCharge(chain.charge);
-    setTolerance(chain.tolerance ?? {});
+    if (chain.tolerance) {
+      const { unit, value } = chain.tolerance;
+      setErrorUnit(unit);
+      setLimits((current) => ({ ...current, [unit]: value }));
+    }
     setHighlight([]);
     setPicks(chain.picks);
   }, []);
@@ -729,8 +746,8 @@ function AnnotateView() {
         custom_entries: custom,
         custom_residues: customRecords.data ?? [],
         excluded_residues: exclude,
-        tolerance_override: customTolerance ? tolerance : null,
-        tolerance: meta.data?.tolerance ?? null,
+        error_limit: tolerance,
+        error_limit_rule: meta.data?.tolerance.rule ?? null,
         intensity_filter_percent: minIntensity,
         saved_chains_hidden_by_filter: hiddenChains,
       },
@@ -765,7 +782,6 @@ function AnnotateView() {
     exclude,
     fileName,
     include,
-    customTolerance,
     tolerance,
     meta.data,
     ordered,
@@ -908,27 +924,26 @@ function AnnotateView() {
               />
             </label>
             <div className="annotate-field">
-              Tolerance
+              Error limit
               <Space.Compact>
                 <InputNumber
-                  aria-label="Tolerance in ppm"
+                  aria-label="Error limit"
                   className="annotate-limit-input"
                   min={0.1}
                   step={1}
-                  placeholder={String(meta.data?.tolerance.ppm ?? '')}
-                  suffix="ppm"
-                  value={tolerance.ppm ?? null}
-                  onChange={(value) => setTolerancePart('ppm', value)}
+                  placeholder={String(
+                    meta.data?.tolerance.defaults[errorUnit] ?? '',
+                  )}
+                  value={limits[errorUnit] ?? null}
+                  onChange={setLimit}
                 />
-                <InputNumber
-                  aria-label="Tolerance floor in mDa"
-                  className="annotate-limit-input"
-                  min={0.1}
-                  step={1}
-                  placeholder={String(meta.data?.tolerance.floor_mda ?? '')}
-                  suffix="mDa"
-                  value={tolerance.floor_mda ?? null}
-                  onChange={(value) => setTolerancePart('floor_mda', value)}
+                <Radio.Group
+                  aria-label="Error unit"
+                  optionType="button"
+                  buttonStyle="solid"
+                  options={['mDa', 'ppm']}
+                  value={errorUnit}
+                  onChange={(event) => setErrorUnit(event.target.value)}
                 />
               </Space.Compact>
             </div>
@@ -944,17 +959,6 @@ function AnnotateView() {
                 suffix="%"
                 value={minIntensity}
                 onChange={handleMinIntensity}
-              />
-            </div>
-            <div className="annotate-field">
-              Show errors in
-              <Radio.Group
-                aria-label="Show errors in"
-                optionType="button"
-                buttonStyle="solid"
-                options={['mDa', 'ppm']}
-                value={errorUnit}
-                onChange={(event) => setErrorUnit(event.target.value)}
               />
             </div>
             <div className="annotate-field">
@@ -1041,13 +1045,12 @@ function AnnotateView() {
           </section>
         )}
         {uploadNote && <Alert type="warning" title={uploadNote} showIcon />}
-        {customTolerance && (
-          <p className="annotate-hint">
-            Your tolerance is used for every match. Each peak&apos;s window is
-            the larger of the two values, so at low m/z only the mDa value
-            matters and at high m/z only the ppm value does.
-          </p>
-        )}
+        <p className="annotate-hint">
+          Only residues within {tolerance.value} {tolerance.unit}
+          {tolerance.unit === 'ppm' ? " of the heavier peak's m/z" : ''} are
+          marked, and every error is shown in {tolerance.unit}
+          {customTolerance ? '' : ' (the default; type your own limit above)'}.
+        </p>
         {minIntensity !== null && (
           <p className="annotate-hint">
             Peaks below {minIntensity}% of the strongest are left out of the
@@ -1104,10 +1107,10 @@ function AnnotateView() {
                   <span className="annotate-inline-hint">
                     Click a peak to select it, click again to remove it, drag
                     across the plot to zoom, drag with the right button to pick
-                    every peak whose top is inside the box, or scroll on an axis
-                    to zoom just that axis and double-click it to zoom back out.
-                    Or press Tab to reach the plot, then use the arrow keys and
-                    Enter.
+                    every peak whose top is inside the box, or drag along an
+                    axis (or scroll on it) to zoom just that axis, and
+                    double-click it to zoom back out. Or press Tab to reach the
+                    plot, then use the arrow keys and Enter.
                   </span>
                 )}
                 {ordered.map((i) => (
@@ -1224,6 +1227,11 @@ function AnnotateView() {
                 {fragments.length >= 3 && (
                   <StepsPanel peaks={peaks} remote={steps} />
                 )}
+                <AnnotateSimilar
+                  peaks={measured}
+                  example={example}
+                  remote={similar}
+                />
                 {example !== null && spectrum.known && (
                   <AnnotateKnown
                     known={spectrum.known}
@@ -1271,8 +1279,9 @@ function AnnotateView() {
               button in their list.
             </li>
             <li>
-              At the top you can set the tolerance, hide weak peaks with the
-              intensity filter, and show errors in mDa or ppm.
+              At the top you can set the error limit, in mDa or in ppm of the
+              heavier peak&apos;s m/z: no residue with a larger error is marked.
+              You can also hide weak peaks with the intensity filter.
             </li>
             <li>
               Download the figure (SVG), the numbers (CSV) or everything (JSON)
@@ -1281,8 +1290,9 @@ function AnnotateView() {
           </ol>
           <p className="annotate-hint">
             A residue that fits a gap is a mass match, not proof. Check it
-            against the rest of the spectrum. Scroll on an axis to zoom it, and
-            double-click the axis to zoom back out.
+            against the rest of the spectrum. Drag along an axis to zoom it
+            (right or up zooms in), or scroll on it, and double-click the axis
+            to zoom back out.
           </p>
         </section>
         <AnnotateFeedback example={example} />

@@ -169,6 +169,60 @@ function AnnotateSpectrum({
     [fittedTop, yTop],
   );
 
+  // pulling an axis: drag right on m/z or up on intensity to zoom in, the other way to zoom out
+  const axisDrag = useRef<{
+    axis: 'x' | 'y';
+    start: number;
+    domain: [number, number];
+    top: number;
+    share: number;
+  } | null>(null);
+  const pullStart =
+    (axis: 'x' | 'y') => (event: PointerEvent<SVGRectElement>) => {
+      event.currentTarget.setPointerCapture(event.pointerId);
+      const box = event.currentTarget.getBoundingClientRect();
+      axisDrag.current = {
+        axis,
+        start: axis === 'x' ? event.clientX : event.clientY,
+        domain: [domain[0], domain[1]],
+        top: yTop ?? fittedTop,
+        share: Math.min(Math.max((event.clientX - box.left) / box.width, 0), 1),
+      };
+    };
+  const pullMove = (event: PointerEvent<SVGRectElement>) => {
+    const drag = axisDrag.current;
+    if (!drag) {
+      return;
+    }
+    if (drag.axis === 'x') {
+      const [low, high] = drag.domain;
+      const span = Math.max(
+        (high - low) * Math.exp(-(event.clientX - drag.start) / 150),
+        minSpan,
+      );
+      if (span >= fullRange[1] - fullRange[0]) {
+        setZoom(null);
+        return;
+      }
+      // the m/z under the pointer when the drag began stays under it
+      const anchor = low + (high - low) * drag.share;
+      const start = Math.min(
+        Math.max(anchor - span * drag.share, fullRange[0]),
+        fullRange[1] - span,
+      );
+      setZoom([start, start + span]);
+    } else {
+      const next = Math.max(
+        drag.top * Math.exp((event.clientY - drag.start) / 150),
+        minTop,
+      );
+      setYTop(next >= fittedTop ? null : next);
+    }
+  };
+  const pullEnd = () => {
+    axisDrag.current = null;
+  };
+
   // React's own wheel handler is passive and cannot stop the page scrolling, so these are native
   useEffect(() => {
     const xAxis = xAxisRef.current;
@@ -863,10 +917,17 @@ function AnnotateSpectrum({
               width={width - margin.left - margin.right}
               height={margin.bottom}
               fill="transparent"
-              style={{ cursor: 'ew-resize' }}
+              style={{ cursor: 'ew-resize', touchAction: 'none' }}
+              onPointerDown={pullStart('x')}
+              onPointerMove={pullMove}
+              onPointerUp={pullEnd}
+              onPointerCancel={pullEnd}
               onDoubleClick={() => setZoom(null)}
             >
-              <title>Scroll to zoom m/z. Double-click to zoom fully out.</title>
+              <title>
+                Drag right to zoom in on m/z, left to zoom out, or scroll.
+                Double-click to zoom fully out.
+              </title>
             </rect>
             <rect
               ref={yAxisRef}
@@ -876,11 +937,16 @@ function AnnotateSpectrum({
               width={margin.left}
               height={height - margin.bottom}
               fill="transparent"
-              style={{ cursor: 'ns-resize' }}
+              style={{ cursor: 'ns-resize', touchAction: 'none' }}
+              onPointerDown={pullStart('y')}
+              onPointerMove={pullMove}
+              onPointerUp={pullEnd}
+              onPointerCancel={pullEnd}
               onDoubleClick={() => setYTop(null)}
             >
               <title>
-                Scroll to zoom intensity. Double-click to zoom fully out.
+                Drag up to zoom in on intensity, down to zoom out, or scroll.
+                Double-click to zoom fully out.
               </title>
             </rect>
             <rect

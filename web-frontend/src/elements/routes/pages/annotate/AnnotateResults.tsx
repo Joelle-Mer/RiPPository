@@ -149,6 +149,9 @@ function SavedPanel({
               peaks: {savedSummary(chain, gapMass)} (m/z{' '}
               {peaks[Math.min(...chain.picks)][0].toFixed(2)} to{' '}
               {peaks[Math.max(...chain.picks)][0].toFixed(2)})
+              {chain.tolerance
+                ? `, error limit ${chain.tolerance.value} ${chain.tolerance.unit}`
+                : ''}
             </span>
             <Button size="small" onClick={() => onLoad(chain)}>
               Load

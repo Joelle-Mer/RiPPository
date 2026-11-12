@@ -102,7 +102,11 @@ export interface ExampleRecord {
 
 export interface Meta {
   classes: ResidueClass[];
-  tolerance: { ppm: number; floor_mda: number; rule: string };
+  tolerance: {
+    default: Tolerance;
+    defaults: Record<'mDa' | 'ppm', number>;
+    rule: string;
+  };
   max_peaks: number;
   max_upload_bytes: number;
 }
@@ -134,9 +138,10 @@ export interface Query {
   tolerance?: Tolerance;
 }
 
+// the largest error a shown match may have, in mDa or in ppm of the heavier peak's m/z
 export interface Tolerance {
-  ppm?: number;
-  floor_mda?: number;
+  unit: 'mDa' | 'ppm';
+  value: number;
 }
 
 export interface PeakLink {
@@ -200,4 +205,31 @@ export interface SelectionStep {
   from: number;
   to: number;
   result: GapResult;
+}
+
+export interface SimilarPair {
+  query_index: number;
+  ref_index: number;
+  shifted: boolean;
+}
+
+export interface SimilarRecord {
+  accession: string;
+  name: string;
+  ref_precursor: number | null;
+  ref_peaks: PeakPair[];
+  score: number;
+  n_matched: number;
+  n_matched_shifted: number;
+  n_query_peaks: number;
+  precursor_shift: number | null;
+  tolerance: number;
+  matched_pairs: SimilarPair[];
+}
+
+// the site's own spectral search, best first; a rank among the records, never an identity
+export interface SimilarResult {
+  results: SimilarRecord[];
+  n_scored: number;
+  method: 'modified cosine' | 'cosine';
 }
