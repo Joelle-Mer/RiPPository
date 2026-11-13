@@ -246,6 +246,30 @@ function residueList(candidates: Candidate[]) {
   return candidates.map((c) => c.label).join(' / ');
 }
 
+// the longest label that fits a mark: every reading with the best one's error, then the best one
+// with its error and how many others fit, down to the best one alone. That one is shown on any
+// mark wide enough to point at, so a matched mark is never left blank; hovering shows all of it
+const markMinWidth = 24;
+function markLabel(
+  candidates: Candidate[],
+  error: string,
+  width: number,
+  charWidth: number,
+) {
+  const fits = (text: string) => width > text.length * charWidth + 4;
+  const top = candidates[0].label;
+  const more = candidates.length > 1 ? ` (+${candidates.length - 1})` : '';
+  const tiers = [
+    `${residueList(candidates)} ${error}`,
+    `${top} ${error}${more}`,
+    `${top} ${error}`,
+    residueList(candidates),
+    `${top}${more}`,
+    top,
+  ];
+  return tiers.find(fits) ?? (width >= markMinWidth ? top : '');
+}
+
 function csvCell(value: string | number | null | undefined) {
   if (value === null || value === undefined) {
     return '';
@@ -330,6 +354,7 @@ export {
   precursorLinks,
   precursorNeighbours,
   isJump,
+  markLabel,
   residueList,
   runVerdict,
   safeFileName,

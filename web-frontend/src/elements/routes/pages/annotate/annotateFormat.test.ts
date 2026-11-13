@@ -3,6 +3,7 @@ import {
   gapMassLabel,
   gapOnlyMarks,
   isJump,
+  markLabel,
   chainMarks,
   feedbackLinks,
   chainPath,
@@ -353,5 +354,25 @@ describe('isJump', () => {
     expect(isJump([single, jump])).toBe(false);
     expect(isJump([single])).toBe(false);
     expect(isJump([])).toBe(false);
+  });
+});
+
+describe('markLabel', () => {
+  const c = (label: string, error_mda: number) => ({ label, mass: 1, error_mda });
+  const three = [c('Glu+Gly', 1.2), c('Ala+Asp', 3.4), c('Ser+Val', -5.6)];
+  it('shortens a long label instead of leaving the mark blank', () => {
+    expect(markLabel(three, '+1.2 mDa', 1000, 6)).toBe(
+      'Glu+Gly / Ala+Asp / Ser+Val +1.2 mDa',
+    );
+    expect(markLabel(three, '+1.2 mDa', 140, 6)).toBe('Glu+Gly +1.2 mDa (+2)');
+    expect(markLabel(three, '+1.2 mDa', 105, 6)).toBe('Glu+Gly +1.2 mDa');
+    expect(markLabel(three, '+1.2 mDa', 80, 6)).toBe('Glu+Gly (+2)');
+    expect(markLabel(three, '+1.2 mDa', 50, 6)).toBe('Glu+Gly');
+    // the best residue still shows on a mark too narrow for it, but not on a sliver
+    expect(markLabel(three, '+1.2 mDa', 30, 6)).toBe('Glu+Gly');
+    expect(markLabel(three, '+1.2 mDa', 10, 6)).toBe('');
+  });
+  it('keeps a single reading whole when it fits', () => {
+    expect(markLabel([c('Gly', 0.3)], '+0.3 mDa', 80, 6)).toBe('Gly +0.3 mDa');
   });
 });

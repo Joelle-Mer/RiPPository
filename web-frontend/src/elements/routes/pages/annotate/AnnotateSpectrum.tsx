@@ -23,6 +23,7 @@ import {
   gapMassLabel,
   gapOnlyMarks,
   isJump,
+  markLabel,
   markLanes,
   residueList,
 } from './annotateFormat';
@@ -606,14 +607,21 @@ function AnnotateSpectrum({
       : gapMass
         ? gapMassLabel(span.gap)
         : 'no single residue';
-    // a narrow mark keeps at least its residue, and the whole label is always one hover away
-    const short = matched
-      ? residueList(span.candidates)
-      : gapMass
-        ? span.gap.toFixed(2)
-        : '';
+    // a narrow mark keeps at least its best residue, and the whole label is always one hover away
+    const short = gapMass ? span.gap.toFixed(2) : '';
     const fits = (text: string) => right - left > text.length * 6.4 + 4;
-    const shown = fits(label) ? label : short && fits(short) ? short : '';
+    const shown = matched
+      ? markLabel(
+          span.candidates,
+          formatError(span.candidates[0], errorUnit, 1),
+          right - left,
+          6.4,
+        )
+      : fits(label)
+        ? label
+        : short && fits(short)
+          ? short
+          : '';
     return (
       <g key={'step-' + span.from + '-' + span.to}>
         <title>{label}</title>
@@ -704,12 +712,21 @@ function AnnotateSpectrum({
             mark.candidates.length > 0
               ? `${residueList(mark.candidates)} ${formatError(mark.candidates[0], errorUnit, 1)}`
               : gapMassLabel(mark.gap);
-          const short =
-            mark.candidates.length > 0
-              ? residueList(mark.candidates)
-              : mark.gap.toFixed(2);
+          const short = mark.gap.toFixed(2);
           const fits = (text: string) => right - left > text.length * 6 + 4;
-          const shown = fits(label) ? label : fits(short) ? short : '';
+          const shown =
+            mark.candidates.length > 0
+              ? markLabel(
+                  mark.candidates,
+                  formatError(mark.candidates[0], errorUnit, 1),
+                  right - left,
+                  6,
+                )
+              : fits(label)
+                ? label
+                : fits(short)
+                  ? short
+                  : '';
           return (
             <g key={mark.from + '-' + mark.to}>
               <title>{label}</title>
