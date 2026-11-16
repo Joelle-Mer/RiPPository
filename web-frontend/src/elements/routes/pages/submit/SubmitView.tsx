@@ -3,33 +3,66 @@ import { Button, Card, Col, Collapse, Divider, Form, Input, Modal, Radio, Row, S
 import { Content } from 'antd/es/layout/layout';
 import { usePropertiesContext } from '../../../../context/properties/properties';
 import { calculateExactMass, calculateSplash, parsePeakList } from '../../../../utils/chemistry';
-import { Molecule, SmilesParser } from 'openchemlib';
+import {
+  checkRecord, expectedPrecursorMz, formatRecords, readRecord,
+  type RecordFields, type SpectrumSettings,
+} from './massbankRecord';
+import { SmilesParser } from 'openchemlib';
 import { MolfileSvgRenderer } from 'react-ocl';
 
 export const SUBMISSIONS_KEY = 'rippository_submissions';
 
-// Strip HTML/script tags and trim whitespace
+// Strip HTML tags and trim; values are shown as text, so nothing else needs removing
 function sanitize(s: string | undefined | null): string {
   if (!s) return '';
-  return s.replace(/<[^>]*>/g, '').replace(/javascript:|data:|vbscript:/gi, '').trim();
+  return s.replace(/<[^>]*>/g, '').trim();
+}
+
+// the curator's address, as listed on the More page
+export const CONTACT_EMAIL = 'mergolagreefj@vuw.leidenuniv.nl';
+
+type Prefill = {
+  fields: Partial<RecordFields>;
+  spectra: SpectrumSettings[];
+  orcid?: string;
+  bgc?: { start?: number; end?: number };
+};
+
+// an earlier submission from this browser as a starting point; its peaks stay behind
+function prefillFromSubmission(s: RiPPSubmission): Prefill {
+  const spectra = (s.spectra?.length ? s.spectra : [s]).map((x) => ({
+    instrument: x.instrument ?? '', instrumentType: x.instrumentType ?? '', msType: x.msType ?? 'MS2',
+    ionMode: x.ionMode ?? 'POSITIVE', ionization: x.ionization ?? '', precursorType: x.precursorType ?? '',
+    collisionEnergy: x.collisionEnergy ?? '',
+  }));
+  return {
+    fields: {
+      compoundName: s.compoundName, compoundClass: s.compoundClass, compoundSubClass: s.compoundSubClass,
+      formula: s.formula, smiles: s.smiles, precursorSeq: s.precursorSeq, dois: s.dois ?? [],
+      note: s.note, dbLinks: s.dbLinks, bioactivity: s.bioactivity, origin: s.origin,
+      genome: s.genome ? { mibig: s.genome.mibig, genbank: s.genome.genbank } : undefined,
+    },
+    spectra,
+    orcid: s.orcid,
+    bgc: { start: s.genome?.bgcStart, end: s.genome?.bgcEnd },
+  };
 }
 
 // BGC types imported from shared component
 import {
-  BgcGene, BGC_COLORS, BGC_CATEGORY_LABELS,
-  categorizeBgcGene, parseGenbankCds, BgcGeneMap,
+  BgcGene, parseGenbankCds, BgcGeneMap,
 } from '../../../basic/BgcViewer';
 
 // Allowed chars for database IDs: letters, digits, colon, hyphen, dot, slash, underscore
-const DB_ID_PATTERN = /^[A-Za-z0-9:._\/\-]+$/;
+const DB_ID_PATTERN = /^[A-Za-z0-9:._/-]+$/;
 const DOI_PATTERN = /^10\.\d{4,}\/.+/;
 const FORMULA_PATTERN = /^[A-Za-z0-9]+$/;
 const GENBANK_PATTERN = /^[A-Za-z]{1,2}[0-9]{5,8}(\.[0-9]+)?$/;
-const ORGANISM_PATTERN = /^[A-Za-z0-9 .\-'()]+$/;
 
 export type SpectrumEntry = {
   instrument: string; instrumentType: string; msType: string; ionMode: string;
   ionization: string; precursorType: string; collisionEnergy: string;
+  precursorMz?: string;
   inputMode: 'peaks' | 'mgf';
   peakText: string;
   mgfFileName: string;
@@ -56,109 +89,35 @@ export type RiPPSubmission = {
   origin?: { organism?: string; strain?: string; source?: string; geography?: string };
   genome?: { mibig?: string; genbank?: string; bgcStart?: number; bgcEnd?: number };
   prUrl?: string;
+  // one accession per spectrum, given by the server; accession is the first of them
+  accessions?: string[];
 };
 
-function generateAccession(): string {
-  const stored: RiPPSubmission[] = JSON.parse(
-    localStorage.getItem(SUBMISSIONS_KEY) ?? '[]',
-  );
-  const next = stored.length + 1;
-  return 'RIPPOS-LU-' + String(next).padStart(4, '0');
-}
-
-// ── MassBank record formatter ────────────────────────────────────────────────
-function formatMassBankRecord(sub: RiPPSubmission): string {
-  const lines: string[] = [];
-  const push = (line: string) => lines.push(line);
-
-  push(`ACCESSION: ${sub.accession}`);
-  push(`RECORD_TITLE: ${sub.recordTitle}`);
-  push(`DATE: ${sub.date.replace(/-/g, '.')}`);
-  const author = sub.orcidName
-    ? `${sub.orcidName} (ORCID:${sub.orcid})`
-    : `ORCID:${sub.orcid}`;
-  push(`AUTHORS: ${author}`);
-  push(`LICENSE: ${sub.license}`);
-  push('');
-
-  push(`CH$NAME: ${sub.compoundName}`);
-  const cls = ['Natural Product', 'RiPP', sub.compoundClass, sub.compoundSubClass]
-    .filter(Boolean).join('; ');
-  push(`CH$COMPOUND_CLASS: ${cls}`);
-  push(`CH$FORMULA: ${sub.formula}`);
-  if (sub.exactMass != null) push(`CH$EXACT_MASS: ${sub.exactMass.toFixed(4)}`);
-  if (sub.smiles) push(`CH$SMILES: ${sub.smiles}`);
-  if (sub.inchi) push(`CH$IUPAC: ${sub.inchi}`);
-  if (sub.dbLinks) {
-    for (const { db, id } of sub.dbLinks) push(`CH$LINK: ${db} ${id}`);
+// ── Sending a submission ─────────────────────────────────────────────────────
+// The site's own server checks the records, gives them their accessions and opens the pull request
+// (server-github.ts), so no GitHub key is in this code.
+async function sendSubmission(
+  baseUrl: string,
+  body: {
+    compoundName: string; compoundClass: string; compoundSubClass?: string; formula: string;
+    orcid: string; orcidName?: string; submittedAt: string; records: string[];
+  },
+): Promise<{ prUrl: string; accessions: string[] }> {
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl}/submit-api/submission`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new Error('The RiPPository server could not be reached. Check your connection and try again.');
   }
-  push('');
-
-  if (sub.origin) {
-    if (sub.origin.organism) push(`SP$SCIENTIFIC_NAME: ${sub.origin.organism}`);
-    if (sub.origin.strain) push(`SP$LINEAGE: strain: ${sub.origin.strain}`);
-    if (sub.origin.source) push(`SP$SAMPLE: ${sub.origin.source}`);
-    if (sub.origin.geography) push(`SP$GEOGRAPHY: ${sub.origin.geography}`);
-    push('');
-  }
-
-  const spectraList = sub.spectra && sub.spectra.length > 0 ? sub.spectra : [sub];
-  for (const s of spectraList) {
-    push(`AC$INSTRUMENT: ${s.instrument}`);
-    push(`AC$INSTRUMENT_TYPE: ${s.instrumentType}`);
-    push(`AC$MASS_SPECTROMETRY: MS_TYPE ${s.msType}`);
-    push(`AC$MASS_SPECTROMETRY: ION_MODE ${s.ionMode?.toUpperCase()}`);
-    if (s.collisionEnergy) push(`AC$MASS_SPECTROMETRY: COLLISION_ENERGY ${s.collisionEnergy}`);
-    if (s.ionization) push(`AC$MASS_SPECTROMETRY: IONIZATION ${s.ionization}`);
-    if (s.precursorType) push(`MS$FOCUSED_ION: PRECURSOR_TYPE ${s.precursorType}`);
-    push('');
-  }
-
-  for (const doi of sub.dois) push(`COMMENT: Publication DOI: ${doi}`);
-  if (sub.precursorSeq) push(`COMMENT: PRECURSOR_SEQ ${sub.precursorSeq}`);
-  if (sub.genome?.mibig) push(`COMMENT: MiBIG ${sub.genome.mibig}`);
-  if (sub.genome?.genbank) push(`COMMENT: GenBank ${sub.genome.genbank}`);
-  if (sub.note) push(`COMMENT: ${sub.note}`);
-  if (sub.bioactivity) {
-    for (const b of sub.bioactivity) {
-      const parts = [b.activity, b.target && `target: ${b.target}`, b.mic && `MIC: ${b.mic}`, b.ic50 && `IC50: ${b.ic50}`].filter(Boolean);
-      push(`COMMENT: BIOACTIVITY ${parts.join('; ')}`);
-    }
-  }
-  push('');
-
-  if (sub.splash) push(`PK$SPLASH: ${sub.splash}`);
-  push(`PK$NUM_PEAK: ${sub.peaks.length}`);
-  push('PK$PEAK: m/z int. rel.int.');
-  for (const p of sub.peaks) {
-    push(`  ${p.mz.toFixed(4)} ${p.intensity.toFixed(4)} ${p.rel}`);
-  }
-  push('//');
-
-  return lines.join('\n');
-}
-
-// ── GitHub PR creator ────────────────────────────────────────────────────────
-// The site's own server opens the pull request (server-github.ts), so no GitHub key is in this code.
-async function createGitHubPR(sub: RiPPSubmission, recordContent: string, baseUrl: string): Promise<string> {
-  const res = await fetch(`${baseUrl}/submit-api/submission`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      accession: sub.accession,
-      compoundName: sub.compoundName,
-      compoundClass: sub.compoundClass,
-      compoundSubClass: sub.compoundSubClass,
-      formula: sub.formula,
-      submittedAt: sub.submittedAt,
-      record: recordContent,
-    }),
-  });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok || typeof data.prUrl !== 'string') {
+  if (!res.ok || typeof data.prUrl !== 'string' || !Array.isArray(data.accessions)) {
     throw new Error(data.error ?? `The server answered ${res.status}.`);
   }
-  return data.prUrl;
+  return { prUrl: data.prUrl, accessions: data.accessions };
 }
 
 const RIPP_CLASSES = [
@@ -378,8 +337,9 @@ function SelectWithOther({
   value?: string; onChange?: (val: string) => void; options: string[];
   placeholder?: string; showSearch?: boolean;
 }) {
-  const [isOther, setIsOther] = useState(() => !!value && !options.includes(value));
-  useEffect(() => { if (value === undefined) setIsOther(false); }, [value]);
+  // the box shows when Other... was picked, or when the form fills in a value not in the list
+  const [otherChosen, setIsOther] = useState(false);
+  const isOther = value !== undefined && (otherChosen || (!!value && !options.includes(value)));
   const dropdownVal = isOther ? OTHER : (options.includes(value ?? '') ? value : undefined);
   const opts = [...options.map((o) => ({ value: o, label: o })), { value: OTHER, label: 'Other...' }];
   return (
@@ -419,7 +379,7 @@ function DoiInputRow({
         if (!res.ok) { setMeta(null); setNotFound(true); return; }
         const json = await res.json();
         const msg = json?.message;
-        const title: string = msg?.title?.[0] ?? '';
+        const title: string = (msg?.title?.[0] ?? '').replace(/<[^>]*>/g, '');
         const authors: string = (msg?.author ?? [])
           .map((a: { given?: string; family?: string }) => [a.given, a.family].filter(Boolean).join(' '))
           .join(', ');
@@ -498,7 +458,7 @@ function DbSuggestionPanel({
       try {
         const enc = encodeURIComponent(smiles);
         const res = await fetch(
-          `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${enc}/property/IUPACName,CID/JSON`,
+          `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${enc}/property/IUPACName/JSON`,
         );
         if (res.ok) {
           const data = await res.json();
@@ -511,14 +471,14 @@ function DbSuggestionPanel({
             });
           }
         }
-      } catch (_) { /* ignore */ }
+      } catch { /* ignore */ }
     }
 
     // PubChem by InChIKey
     if (inchikey && !results.some((r) => r.db === 'PubChem CID')) {
       try {
         const res = await fetch(
-          `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/inchikey/${encodeURIComponent(inchikey)}/property/IUPACName,CID/JSON`,
+          `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/inchikey/${encodeURIComponent(inchikey)}/property/IUPACName/JSON`,
         );
         if (res.ok) {
           const data = await res.json();
@@ -531,14 +491,14 @@ function DbSuggestionPanel({
             });
           }
         }
-      } catch (_) { /* ignore */ }
+      } catch { /* ignore */ }
     }
 
     // PubChem by name (fallback)
     if (name && !results.some((r) => r.db === 'PubChem CID')) {
       try {
         const res = await fetch(
-          `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name)}/property/IUPACName,CID/JSON`,
+          `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name)}/property/IUPACName/JSON`,
         );
         if (res.ok) {
           const data = await res.json();
@@ -551,19 +511,20 @@ function DbSuggestionPanel({
             });
           }
         }
-      } catch (_) { /* ignore */ }
+      } catch { /* ignore */ }
     }
 
     // ChEBI by name
     if (name) {
       try {
         const res = await fetch(
-          `https://www.ebi.ac.uk/ebisearch/ws/rest/chebi?query=${encodeURIComponent(name)}&fields=id,name&format=json&size=1`,
+          `https://www.ebi.ac.uk/ebisearch/ws/rest/chebi?query=${encodeURIComponent(name)}&fields=name&format=json&size=1`,
         );
         if (res.ok) {
           const data = await res.json();
           const hit = data?.entries?.[0];
-          if (hit?.id) {
+          const hitName: string = hit?.fields?.name?.[0] ?? '';
+          if (hit?.id && hitName.trim().toLowerCase() === name.toLowerCase()) {
             const chebiId = hit.id.replace('CHEBI:', '');
             results.push({
               db: 'ChEBI', id: `CHEBI:${chebiId}`, matchedBy: 'Name',
@@ -572,33 +533,7 @@ function DbSuggestionPanel({
             });
           }
         }
-      } catch (_) { /* ignore */ }
-    }
-
-    // KEGG by name
-    if (name) {
-      try {
-        const res = await fetch(
-          `https://rest.kegg.jp/find/compound/${encodeURIComponent(name)}`,
-        );
-        if (res.ok) {
-          const text = await res.text();
-          const firstLine = text.trim().split('\n')[0];
-          if (firstLine) {
-            const parts = firstLine.split('\t');
-            const rawId = parts[0]?.trim();   // e.g. "cpd:C05687"
-            const label = parts[1]?.split(';')[0]?.trim();
-            if (rawId) {
-              const keggId = rawId.replace(/^cpd:/, '');
-              results.push({
-                db: 'KEGG', id: keggId, matchedBy: 'Name',
-                url: `https://www.genome.jp/entry/${keggId}`,
-                displayName: label,
-              });
-            }
-          }
-        }
-      } catch (_) { /* ignore */ }
+      } catch { /* ignore */ }
     }
 
     // Wikidata by InChIKey (covers LOTUS natural products entries)
@@ -619,67 +554,7 @@ function DbSuggestionPanel({
             });
           }
         }
-      } catch (_) { /* ignore */ }
-    }
-
-    // HMDB by name
-    if (name) {
-      try {
-        const res = await fetch(
-          `https://hmdb.ca/metabolites.json?q=${encodeURIComponent(name)}&utf8=true`,
-        );
-        if (res.ok) {
-          const data = await res.json();
-          const hit = data?.[0];
-          if (hit?.accession) {
-            results.push({
-              db: 'HMDB', id: hit.accession, matchedBy: 'Name',
-              url: `https://hmdb.ca/metabolites/${hit.accession}`,
-              displayName: hit.name,
-            });
-          }
-        }
-      } catch (_) { /* ignore */ }
-    }
-
-    // NPAtlas by InChIKey (most reliable)
-    if (inchikey) {
-      try {
-        const res = await fetch(
-          `https://www.npatlas.org/api/v1/compounds?inchikey=${encodeURIComponent(inchikey)}&limit=1`,
-        );
-        if (res.ok) {
-          const data = await res.json();
-          const hit = data?.[0];
-          if (hit?.npaid) {
-            results.push({
-              db: 'NPAtlas', id: hit.npaid, matchedBy: 'InChIKey',
-              url: `https://www.npatlas.org/explore/compounds/${hit.npaid}`,
-              displayName: hit.original_name,
-            });
-          }
-        }
-      } catch (_) { /* ignore */ }
-    }
-
-    // NPAtlas by name (fallback)
-    if (name && !results.some((r) => r.db === 'NPAtlas')) {
-      try {
-        const res = await fetch(
-          `https://www.npatlas.org/api/v1/compounds?compound_name=${encodeURIComponent(name)}&limit=1`,
-        );
-        if (res.ok) {
-          const data = await res.json();
-          const hit = data?.[0];
-          if (hit?.npaid) {
-            results.push({
-              db: 'NPAtlas', id: hit.npaid, matchedBy: 'Name',
-              url: `https://www.npatlas.org/explore/compounds/${hit.npaid}`,
-              displayName: hit.original_name,
-            });
-          }
-        }
-      } catch (_) { /* ignore */ }
+      } catch { /* ignore */ }
     }
 
     setSuggestions(results);
@@ -703,7 +578,7 @@ function DbSuggestionPanel({
           {searched ? 'Re-search' : 'Search databases'}
         </Button>
       </div>
-      {searching && <div style={{ fontSize: 12, color: '#6b7280' }}>Searching PubChem, ChEBI, KEGG, Wikidata, HMDB and NPAtlas...</div>}
+      {searching && <div style={{ fontSize: 12, color: '#6b7280' }}>Searching PubChem, ChEBI and Wikidata...</div>}
       {searched && !searching && suggestions.length === 0 && (
         <div style={{ fontSize: 12, color: '#6b7280' }}>No matches found.</div>
       )}
@@ -731,16 +606,29 @@ function DbSuggestionPanel({
 }
 
 
+// PEPMASS of the first spectrum in an mgf file, and how many spectra the file holds
+function mgfHeader(text: string): { pepmass: string; count: number } {
+  const count = (text.match(/^\s*BEGIN IONS\s*$/gim) ?? []).length;
+  const pep = /^\s*PEPMASS\s*=\s*([0-9.]+)/im.exec(text);
+  return { pepmass: pep?.[1] ?? '', count };
+}
+
 function SpectrumCard({
-  idx, entry, onChange, onRemove, canRemove,
+  idx, entry, onChange, onRemove, canRemove, exactMass,
 }: {
   idx: number; entry: SpectrumEntry;
   onChange: (updates: Partial<SpectrumEntry>) => void;
   onRemove: () => void; canRemove: boolean;
+  exactMass: number | null;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const parsedPeaks = useMemo(() => parsePeakList(entry.peakText), [entry.peakText]);
   const mgfPeaks = useMemo(() => (entry.mgfContent ? parseMgf(entry.mgfContent) : null), [entry.mgfContent]);
+  const mgfInfo = useMemo(() => mgfHeader(entry.mgfContent), [entry.mgfContent]);
+  const expected = expectedPrecursorMz(exactMass, entry.precursorType);
+  const entered = Number(entry.precursorMz);
+  const ppm = expected && entry.precursorMz?.trim() && Number.isFinite(entered)
+    ? ((entered - expected) / expected) * 1e6 : null;
 
   return (
     <div style={{ border: '1px solid #d1d5db', borderRadius: 8, padding: '16px 20px', marginBottom: 16, backgroundColor: '#fafafa' }}>
@@ -796,6 +684,22 @@ function SpectrumCard({
                 value={entry.collisionEnergy} onChange={(v) => onChange({ collisionEnergy: v })} />
             </Form.Item>
           </Col>
+          <Col span={16}>
+            <Form.Item label="Precursor m/z (measured)" style={{ marginBottom: 12 }}
+              extra={
+                <span style={{ fontSize: 12, color: '#6b7280' }}>
+                  {expected
+                    ? <>Expected from the formula and precursor type: {expected.toFixed(4)}
+                        {ppm !== null && <> ({ppm >= 0 ? '+' : ''}{ppm.toFixed(1)} ppm)</>}</>
+                    : 'The m/z of the ion that was fragmented.'}
+                </span>
+              }>
+              <Input value={entry.precursorMz ?? ''} placeholder="e.g. 535.2156"
+                onChange={(e) => onChange({ precursorMz: e.target.value.trim() })}
+                status={entry.precursorMz && !Number.isFinite(entered) ? 'error' : undefined}
+                style={{ maxWidth: 220 }} />
+            </Form.Item>
+          </Col>
         </Row>
       )}
       <Form.Item label="Peak Data" style={{ marginBottom: 0 }}>
@@ -832,7 +736,14 @@ function SpectrumCard({
                 const file = e.target.files?.[0];
                 if (!file) return;
                 const reader = new FileReader();
-                reader.onload = (ev) => onChange({ mgfFileName: file.name, mgfContent: ev.target?.result as string });
+                reader.onload = (ev) => {
+                  const content = ev.target?.result as string;
+                  const { pepmass } = mgfHeader(content);
+                  onChange({
+                    mgfFileName: file.name, mgfContent: content,
+                    ...(pepmass && !entry.precursorMz ? { precursorMz: pepmass } : {}),
+                  });
+                };
                 reader.readAsText(file);
                 e.target.value = '';
               }}
@@ -848,6 +759,12 @@ function SpectrumCard({
                 {mgfPeaks.length} peak{mgfPeaks.length !== 1 ? 's' : ''} parsed from MGF
               </div>
             )}
+            {entry.mgfContent && mgfInfo.count > 1 && (
+              <div style={{ marginTop: 4, fontSize: 12, color: '#b45309' }}>
+                This file holds {mgfInfo.count} spectra; only the first is used. Add each other
+                spectrum with &quot;Add another spectrum&quot;.
+              </div>
+            )}
             {entry.mgfContent && !mgfPeaks && (
               <div style={{ marginTop: 6, fontSize: 12, color: '#dc2626' }}>Could not parse peaks from MGF file</div>
             )}
@@ -858,7 +775,7 @@ function SpectrumCard({
   );
 }
 
-function SubmitView() {
+function SubmitView({ startFromExisting = false, onBack }: { startFromExisting?: boolean; onBack?: () => void }) {
   const { baseUrl } = usePropertiesContext();
   const [form] = Form.useForm();
   const [messageApi, ctx] = message.useMessage();
@@ -922,45 +839,6 @@ function SubmitView() {
     setSpectra((prev) => prev.map((s, i) => i === idx ? { ...s, ...updates } : s));
   }, []);
 
-  const accessionRef = useRef(generateAccession());
-
-  // Pre-fill from template (set by "Use as template" in SubmitLandingView)
-  useEffect(() => {
-    const raw = sessionStorage.getItem('rippository_new_template');
-    if (!raw) return;
-    sessionStorage.removeItem('rippository_new_template');
-    try {
-      const t = JSON.parse(raw) as RiPPSubmission;
-      form.setFieldsValue({
-        compoundName: t.compoundName ?? '',
-        compoundClass: t.compoundClass ?? '',
-        compoundSubClass: t.compoundSubClass ?? undefined,
-        formula: t.formula ?? '',
-        orcid: '',
-        license: t.license ?? '',
-        genomeMibig: t.genome?.mibig ?? '',
-        genomeGenbank: t.genome?.genbank ?? '',
-        originOrganism: t.origin?.organism ?? '',
-        originStrain: t.origin?.strain ?? '',
-        originSource: t.origin?.source ?? '',
-        originGeography: t.origin?.geography ?? '',
-        ...(t.smiles ? { smiles: t.smiles } : {}),
-        ...(t.inchi ? { inchi: t.inchi } : {}),
-        ...(t.inchikey ? { inchikey: t.inchikey } : {}),
-        ...(t.precursorSeq ? { precursorSeq: t.precursorSeq } : {}),
-      });
-      if (t.smiles) setStructureValue(t.smiles);
-      if (t.dois?.length) setDois(t.dois);
-      if (t.note) setNote(t.note);
-      if (t.dbLinks?.length) setDbLinks(t.dbLinks.map((l) => ({ db: l.db ?? '', id: l.id ?? '' })));
-      if (t.bioactivity?.length) setBioactivities(t.bioactivity.map((b) => ({
-        activity: b.activity ?? '', target: b.target ?? '', mic: b.mic ?? '', ic50: b.ic50 ?? '',
-      })));
-      if (t.genome?.bgcStart != null) form.setFieldValue('bgcStart', String(t.genome.bgcStart));
-      if (t.genome?.bgcEnd != null) form.setFieldValue('bgcEnd', String(t.genome.bgcEnd));
-    } catch { /* ignore parse errors */ }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const [debouncedSmiles, setDebouncedSmiles] = useState('');
   const [smilesInfo, setSmilesInfo] = useState<{ formula: string; inchi: string; inchikey: string } | null>(null);
@@ -1098,201 +976,331 @@ function SubmitView() {
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
+  const [outcome, setOutcome] = useState<
+    null | { ok: true; prUrl: string; accessions: string[]; sub: RiPPSubmission } | { ok: false; error: string }
+  >(null);
+
   const handleSubmit = useCallback(async () => {
+    let values;
     try {
-      const values = await form.validateFields();
-      const filteredDois = dois.filter((d) => d.trim());
-      if (filteredDois.length === 0) {
-        messageApi.error('Please enter at least one publication DOI.'); return;
+      values = await form.validateFields();
+    } catch {
+      messageApi.error('Some fields need attention; they are marked in red.');
+      return;
+    }
+    const filteredDois = dois.map((d) => d.trim()).filter(Boolean);
+    if (filteredDois.length === 0) {
+      messageApi.error('Please enter at least one publication DOI.'); return;
+    }
+    if (filteredDois.some((d) => !DOI_PATTERN.test(d))) {
+      messageApi.error('Invalid DOI format. Must start with "10." (e.g. 10.1038/s41586-021-03564-6).'); return;
+    }
+    const invalidDbLinks = dbLinks.filter((l) => l.db && l.id.trim() && !DB_ID_PATTERN.test(l.id.trim()));
+    if (invalidDbLinks.length > 0) {
+      messageApi.error('Database IDs may only contain letters, numbers, colons, hyphens, dots, slashes, and underscores.'); return;
+    }
+    if (!structureValue.trim() && !values.precursorSeq?.trim()) {
+      messageApi.error('Please provide a SMILES structure or a precursor peptide sequence.'); return;
+    }
+    for (let i = 0; i < spectra.length; i++) {
+      const s = spectra[i];
+      if (!s.instrument) { messageApi.error(`Spectrum ${i + 1}: please select an instrument.`); return; }
+      if (!s.instrumentType) { messageApi.error(`Spectrum ${i + 1}: please select an instrument type.`); return; }
+      if (!s.ionization) { messageApi.error(`Spectrum ${i + 1}: please select ionization.`); return; }
+      if (!s.precursorType) { messageApi.error(`Spectrum ${i + 1}: please select precursor type.`); return; }
+      if (s.msType !== 'MS1') {
+        if (!s.collisionEnergy) { messageApi.error(`Spectrum ${i + 1}: please select collision energy.`); return; }
+        const mz = Number(s.precursorMz);
+        if (!s.precursorMz?.trim() || !Number.isFinite(mz) || mz <= 0) {
+          messageApi.error(`Spectrum ${i + 1}: please enter the measured precursor m/z.`); return;
+        }
       }
-      const invalidDois = filteredDois.filter((d) => !DOI_PATTERN.test(d.trim()));
-      if (invalidDois.length > 0) {
-        messageApi.error('Invalid DOI format. Must start with "10." (e.g. 10.1038/s41586-021-03564-6).'); return;
-      }
-      const invalidDbLinks = dbLinks.filter((l) => l.db && l.id.trim() && !DB_ID_PATTERN.test(l.id.trim()));
-      if (invalidDbLinks.length > 0) {
-        messageApi.error('Database IDs may only contain letters, numbers, colons, hyphens, dots, slashes, and underscores.'); return;
-      }
-      if (!structureValue.trim() && !values.precursorSeq?.trim()) {
-        messageApi.error('Please provide a SMILES structure or a precursor peptide sequence.'); return;
-      }
-      for (let i = 0; i < spectra.length; i++) {
-        const s = spectra[i];
-        if (!s.instrument) { messageApi.error(`Spectrum ${i + 1}: please select an instrument.`); return; }
-        if (!s.instrumentType) { messageApi.error(`Spectrum ${i + 1}: please select an instrument type.`); return; }
-        if (!s.ionization) { messageApi.error(`Spectrum ${i + 1}: please select ionization.`); return; }
-        if (!s.precursorType) { messageApi.error(`Spectrum ${i + 1}: please select precursor type.`); return; }
-        if (s.msType !== 'MS1' && !s.collisionEnergy && s.collisionEnergy !== 'Not reported') { messageApi.error(`Spectrum ${i + 1}: please select collision energy.`); return; }
-        const peaks = s.inputMode === 'peaks' ? parsePeakList(s.peakText) : parseMgf(s.mgfContent);
-        if (!peaks || peaks.length === 0) { messageApi.error(`Spectrum ${i + 1}: please provide valid peak data.`); return; }
-      }
-      setSubmitting(true);
+      const peaks = s.inputMode === 'peaks' ? parsePeakList(s.peakText) : parseMgf(s.mgfContent);
+      if (!peaks || peaks.length === 0) { messageApi.error(`Spectrum ${i + 1}: please provide valid peak data.`); return; }
+    }
+    setSubmitting(true);
+    try {
       const spectraWithPeaks = spectra.map((s) => ({
         ...s,
+        precursorMz: s.msType === 'MS1' ? undefined : s.precursorMz?.trim(),
         peaks: (s.inputMode === 'peaks' ? parsePeakList(s.peakText) : parseMgf(s.mgfContent)) ?? [],
       }));
-      const firstS = spectraWithPeaks[0];
-      const splash = await calculateSplash(firstS.peaks).catch(() => '');
-      const sub: RiPPSubmission = {
-        orcid: values.orcid,
+      const splashes = await Promise.all(spectraWithPeaks.map((s) => calculateSplash(s.peaks).catch(() => '')));
+      const fields: RecordFields = {
+        orcid: String(values.orcid).trim(),
         orcidName: orcidName ?? undefined,
-        contactEmail: sanitize(values.contactEmail) || undefined,
-        accession: accessionRef.current,
-        recordTitle: [compoundName || '?', firstS.instrumentType || '?', firstS.msType].join('; '),
-        date: today, license: 'CC BY-SA', exactMass, numPeak: firstS.peaks.length,
-        status: 'Pending', submittedAt: new Date().toISOString(),
-        dois: dois.filter((d) => d.trim()),
-        compoundName: sanitize(values.compoundName), compoundClass: sanitize(values.compoundClass), compoundSubClass: sanitize(values.compoundSubClass) || undefined, formula: sanitize(values.formula),
+        date: today,
+        compoundName: sanitize(values.compoundName),
+        compoundClass: sanitize(values.compoundClass),
+        compoundSubClass: sanitize(values.compoundSubClass) || undefined,
+        formula: sanitize(values.formula),
+        exactMass,
         smiles: structureValue.trim() || undefined,
         inchi: smilesInfo?.inchi || undefined,
-        inchikey: smilesInfo?.inchikey || undefined,
-        splash: splash || undefined,
         precursorSeq: sanitize(values.precursorSeq) || undefined,
+        dois: filteredDois,
+        note: sanitize(note) || undefined,
+        dbLinks: dbLinks.filter((l) => l.db && l.id.trim()).map((l) => ({ db: l.db, id: l.id.trim() })),
+        bioactivity: bioactivities.filter((b) => b.activity.trim()).map((b) => ({
+          activity: sanitize(b.activity), target: sanitize(b.target) || undefined,
+          mic: sanitize(b.mic) || undefined, ic50: sanitize(b.ic50) || undefined,
+        })),
+        origin: {
+          organism: sanitize(values.originOrganism) || undefined, strain: sanitize(values.originStrain) || undefined,
+          source: sanitize(values.originSource) || undefined, geography: sanitize(values.originGeography) || undefined,
+        },
+        genome: { mibig: values.genomeMibig?.trim() || undefined, genbank: values.genomeGenbank?.trim() || undefined },
+      };
+      const records = formatRecords(fields, spectraWithPeaks.map((s, i) => ({
+        instrument: s.instrument, instrumentType: s.instrumentType, msType: s.msType, ionMode: s.ionMode,
+        ionization: s.ionization, precursorType: s.precursorType,
+        collisionEnergy: s.msType === 'MS1' ? '' : s.collisionEnergy,
+        precursorMz: s.precursorMz, peaks: s.peaks, splash: splashes[i] || undefined,
+      })));
+      // the same check the server makes, so a problem shows here, before anything is sent
+      for (const [i, record] of records.entries()) {
+        const problem = checkRecord(record);
+        if (problem) throw new Error((records.length > 1 ? `Spectrum ${i + 1}: ` : '') + problem);
+      }
+      const { prUrl, accessions } = await sendSubmission(baseUrl, {
+        compoundName: fields.compoundName, compoundClass: fields.compoundClass,
+        compoundSubClass: fields.compoundSubClass, formula: fields.formula,
+        orcid: fields.orcid, orcidName: fields.orcidName,
+        submittedAt: new Date().toISOString(), records,
+      });
+      const firstS = spectraWithPeaks[0];
+      const sub: RiPPSubmission = {
+        orcid: fields.orcid, orcidName: fields.orcidName,
+        accession: accessions[0], accessions, prUrl,
+        recordTitle: [fields.compoundName, firstS.instrumentType, firstS.msType].join('; '),
+        date: today, license: 'CC BY-SA', exactMass, numPeak: firstS.peaks.length,
+        status: 'Pending', submittedAt: new Date().toISOString(),
+        dois: fields.dois, compoundName: fields.compoundName, compoundClass: fields.compoundClass,
+        compoundSubClass: fields.compoundSubClass, formula: fields.formula,
+        smiles: fields.smiles, inchi: fields.inchi, inchikey: smilesInfo?.inchikey || undefined,
+        splash: splashes[0] || undefined, precursorSeq: fields.precursorSeq,
         instrument: firstS.instrument, instrumentType: firstS.instrumentType,
         msType: firstS.msType, ionMode: firstS.ionMode,
         collisionEnergy: firstS.collisionEnergy, ionization: firstS.ionization,
         precursorType: firstS.precursorType, peaks: firstS.peaks,
         spectra: spectraWithPeaks,
-        note: sanitize(note) || undefined,
-        dbLinks: dbLinks.filter((l) => l.db && l.id.trim()).length > 0
-          ? dbLinks.filter((l) => l.db && l.id.trim()).map((l) => ({ db: l.db, id: l.id.trim() }))
-          : undefined,
-        bioactivity: bioactivities.filter((b) => b.activity.trim()).length > 0
-          ? bioactivities.filter((b) => b.activity.trim()).map((b) => ({
-              activity: sanitize(b.activity), target: sanitize(b.target) || undefined,
-              mic: sanitize(b.mic) || undefined, ic50: sanitize(b.ic50) || undefined,
-            })) : undefined,
-        origin: (values.originOrganism || values.originStrain || values.originSource || values.originGeography)
-          ? { organism: sanitize(values.originOrganism) || undefined, strain: sanitize(values.originStrain) || undefined,
-              source: sanitize(values.originSource) || undefined, geography: sanitize(values.originGeography) || undefined }
-          : undefined,
-        genome: (values.genomeMibig || values.genomeGenbank)
-          ? { mibig: values.genomeMibig?.trim() || undefined, genbank: values.genomeGenbank?.trim() || undefined,
-              bgcStart: bgcStart ?? undefined, bgcEnd: bgcEnd ?? undefined }
-          : undefined,
+        note: fields.note,
+        dbLinks: fields.dbLinks?.length ? fields.dbLinks : undefined,
+        bioactivity: fields.bioactivity?.length ? fields.bioactivity : undefined,
+        origin: Object.values(fields.origin ?? {}).some(Boolean) ? fields.origin : undefined,
+        genome: fields.genome?.mibig || fields.genome?.genbank
+          ? { ...fields.genome, bgcStart: bgcStart ?? undefined, bgcEnd: bgcEnd ?? undefined } : undefined,
       };
-      const recordTxt = formatMassBankRecord(sub);
-      let prUrl: string | undefined;
       try {
-        prUrl = await createGitHubPR(sub, recordTxt, baseUrl);
-        sub.prUrl = prUrl;
-      } catch (ghErr) {
-        console.error('GitHub PR creation failed:', ghErr);
-        messageApi.warning('Record saved locally, but could not create GitHub PR: ' + (ghErr instanceof Error ? ghErr.message : String(ghErr)), 8);
-      }
-      const existing: RiPPSubmission[] = JSON.parse(localStorage.getItem(SUBMISSIONS_KEY) ?? '[]');
-      existing.unshift(sub);
-      localStorage.setItem(SUBMISSIONS_KEY, JSON.stringify(existing));
-      if (prUrl) {
-        messageApi.success(
-          `Submitted! A pull request has been opened for review. Track it in More → Submissions.`,
-          8,
-        );
-      } else {
-        messageApi.info('Submitted locally. Job ID: ' + sub.accession + '. Track status in More → Submissions.', 7);
-      }
+        const existing: RiPPSubmission[] = JSON.parse(localStorage.getItem(SUBMISSIONS_KEY) ?? '[]');
+        existing.unshift(sub);
+        localStorage.setItem(SUBMISSIONS_KEY, JSON.stringify(existing));
+      } catch { /* the pull request is open either way; only this browser's list misses it */ }
+      setOutcome({ ok: true, prUrl, accessions, sub });
       form.resetFields();
       setOrcidName(null); setOrcidLoading(false); setOrcidError(false);
       setStructureValue(''); setNote(''); setDbLinks([]);
       setDois(['']); setBioactivities([]); setSmilesInfo(null); setSmilesMolfile(null);
       setSmilesError(false); setDebouncedSmiles('');
       setSpectra([defaultSpectrum()]); setMibigStatus('idle'); setBgcClass([]);
-      accessionRef.current = generateAccession();
-    } catch { /* Ant Design shows field-level errors automatically */ }
-    finally { setSubmitting(false); }
-  }, [form, structureValue, spectra, today, exactMass, messageApi, note, dbLinks, dois, bioactivities, smilesInfo, compoundName]);
+      setBgcStart(null); setBgcEnd(null); setBgcGenes([]);
+    } catch (e) {
+      // the form keeps everything, so nothing typed is lost
+      setOutcome({ ok: false, error: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setSubmitting(false);
+    }
+  }, [form, structureValue, spectra, today, exactMass, messageApi, note, dbLinks, dois, bioactivities,
+    smilesInfo, orcidName, bgcStart, bgcEnd, baseUrl]);
 
   const req = (label: string) => ({ required: true, message: label + ' is required.' });
 
-  // ── Fill-from-existing modal ─────────────────────────────────────────────
-  const [fillModalOpen, setFillModalOpen] = useState(false);
-  const [fillSelected, setFillSelected] = useState<RiPPSubmission | null>(null);
-  const allRecords: RiPPSubmission[] = useMemo(() => {
+  // ── Start from an earlier submission or a record in RiPPository ─────────
+  const [pickerOpen, setPickerOpen] = useState(startFromExisting);
+  const [pickChoice, setPickChoice] = useState<string | undefined>();
+  const [picking, setPicking] = useState(false);
+  const [dbRecords, setDbRecords] = useState<Array<{ accession: string; title: string }> | null>(null);
+  const [dbError, setDbError] = useState(false);
+  // read again whenever the picker opens or a submission was just made
+  const localSubs: RiPPSubmission[] = useMemo(() => {
+    void pickerOpen; void outcome;
     try { return JSON.parse(localStorage.getItem(SUBMISSIONS_KEY) ?? '[]'); } catch { return []; }
-  }, []);
+  }, [pickerOpen, outcome]);
 
-  const handleFillFromExisting = useCallback(() => {
-    if (!fillSelected) return;
-    const t = fillSelected;
+  useEffect(() => {
+    if (!pickerOpen || dbRecords) return;
+    let gone = false;
+    setDbError(false);
+    fetch(`${baseUrl}/submit-api/records`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((list) => { if (!gone) setDbRecords(Array.isArray(list) ? list : []); })
+      .catch(() => { if (!gone) setDbError(true); });
+    return () => { gone = true; };
+  }, [pickerOpen, dbRecords, baseUrl]);
+
+  // every field filled from the source, except the MS/MS data and the precursor m/z
+  const applyPrefill = useCallback((p: Prefill, from: string) => {
+    const f = p.fields;
     form.setFieldsValue({
-      compoundName: t.compoundName ?? '',
-      compoundClass: t.compoundClass ?? '',
-      formula: t.formula ?? '',
-      license: t.license ?? '',
-      genomeMibig: t.genome?.mibig ?? '',
-      genomeGenbank: t.genome?.genbank ?? '',
-      originOrganism: t.origin?.organism ?? '',
-      originStrain: t.origin?.strain ?? '',
-      originSource: t.origin?.source ?? '',
-      originGeography: t.origin?.geography ?? '',
-      ...(t.inchi ? { inchi: t.inchi } : {}),
-      ...(t.inchikey ? { inchikey: t.inchikey } : {}),
-      ...(t.precursorSeq ? { precursorSeq: t.precursorSeq } : {}),
+      ...(p.orcid ? { orcid: p.orcid } : {}),
+      compoundName: f.compoundName ?? '',
+      compoundClass: f.compoundClass || undefined,
+      compoundSubClass: f.compoundSubClass || undefined,
+      formula: f.formula ?? '',
+      precursorSeq: f.precursorSeq ?? '',
+      genomeMibig: f.genome?.mibig ?? '',
+      genomeGenbank: f.genome?.genbank ?? '',
+      originOrganism: f.origin?.organism ?? '',
+      originStrain: f.origin?.strain ?? '',
+      originSource: f.origin?.source || undefined,
+      originGeography: f.origin?.geography ?? '',
     });
-    if (t.smiles) setStructureValue(t.smiles);
-    if (t.dois?.length) setDois(t.dois);
-    if (t.note) setNote(t.note);
-    if (t.dbLinks?.length) setDbLinks(t.dbLinks.map((l) => ({ db: l.db ?? '', id: l.id ?? '' })));
-    if (t.bioactivity?.length) setBioactivities(t.bioactivity.map((b) => ({
+    setStructureValue(f.smiles ?? '');
+    setDois(f.dois?.length ? [...f.dois] : ['']);
+    setNote(f.note ?? '');
+    setDbLinks((f.dbLinks ?? []).map((l) => ({ db: l.db, id: l.id })));
+    setBioactivities((f.bioactivity ?? []).map((b) => ({
       activity: b.activity ?? '', target: b.target ?? '', mic: b.mic ?? '', ic50: b.ic50 ?? '',
     })));
-    setFillModalOpen(false);
-    setFillSelected(null);
-    messageApi.success('Form pre-filled from existing record. Please review and update all fields as needed.');
-  }, [fillSelected, form, messageApi]);
+    setSpectra((p.spectra.length ? p.spectra : [defaultSpectrum()]).map((s) => ({
+      ...defaultSpectrum(), ...s, precursorMz: '',
+    })));
+    setBgcStart(p.bgc?.start ?? null); setBgcEnd(p.bgc?.end ?? null);
+    setBgcGenes([]); setBgcError(false); setMibigStatus('idle'); setBgcClass([]);
+    if (p.orcid) { setOrcidName(null); setOrcidError(false); void fetchOrcidName(); }
+    messageApi.success(`Filled in from ${from}. Add the MS/MS data and precursor m/z for each spectrum, check every field, then submit.`, 8);
+  }, [form, messageApi, fetchOrcidName]);
+
+  const handlePick = useCallback(async () => {
+    if (!pickChoice) return;
+    setPicking(true);
+    try {
+      if (pickChoice.startsWith('local:')) {
+        const sub = localSubs[Number(pickChoice.slice(6))];
+        if (sub) applyPrefill(prefillFromSubmission(sub), `your submission of ${sub.compoundName}`);
+      } else {
+        const accession = pickChoice.slice(3);
+        const res = await fetch(`${baseUrl}/submit-api/records/${encodeURIComponent(accession)}`);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || typeof data.text !== 'string') throw new Error(data.error ?? `The server answered ${res.status}.`);
+        const read = readRecord(data.text);
+        applyPrefill({ fields: read.fields, spectra: [read.spectrum] }, accession);
+      }
+      setPickerOpen(false);
+      setPickChoice(undefined);
+    } catch (e) {
+      messageApi.error('That record could not be read: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setPicking(false);
+    }
+  }, [pickChoice, localSubs, applyPrefill, baseUrl, messageApi]);
 
   return (
     <Content style={{ width: '100%', height: '100%', overflowY: 'auto', backgroundColor: '#f8fafc' }}>
       {ctx}
 
-      {/* Fill-from-existing modal */}
       <Modal
-        open={fillModalOpen}
-        title="Pre-fill from existing record"
-        onCancel={() => { setFillModalOpen(false); setFillSelected(null); }}
-        onOk={handleFillFromExisting}
-        okText="Pre-fill form"
-        okButtonProps={{ disabled: !fillSelected }}
-        width={640}
+        open={pickerOpen}
+        title="Start from an earlier submission"
+        onCancel={() => { setPickerOpen(false); setPickChoice(undefined); }}
+        onOk={handlePick}
+        okText="Fill in the form"
+        okButtonProps={{ disabled: !pickChoice, loading: picking }}
+        width={680}
       >
         <p style={{ color: '#6b7280', marginBottom: 12, fontSize: 13 }}>
-          Select a record to copy its compound data, structure, origin, and other fields into
-          the form. You can edit everything freely afterwards; a new accession will be assigned.
+          Every field is copied into the form except the MS/MS data and the precursor m/z, which
+          you add for the new spectra. Nothing in the record you pick is changed; the new
+          submission gets accession numbers of its own.
         </p>
-        {allRecords.length === 0 ? (
-          <div style={{ color: '#9ca3af', fontStyle: 'italic' }}>No existing records found.</div>
-        ) : (
-          <select
-            style={{ width: '100%', padding: '8px 12px', border: '1px solid #d9d9d9', borderRadius: 6, fontSize: 14 }}
-            onChange={(e) => setFillSelected(allRecords.find((r) => r.accession === e.target.value) ?? null)}
-            defaultValue=""
-          >
-            <option value="" disabled>Select a record</option>
-            {allRecords.map((r) => (
-              <option key={r.accession} value={r.accession}>
-                {r.accession}: {r.compoundName ?? r.recordTitle}
-              </option>
-            ))}
-          </select>
+        <Select
+          showSearch
+          style={{ width: '100%' }}
+          placeholder={dbRecords || dbError ? 'Choose a submission or a record' : 'Loading the records…'}
+          optionFilterProp="label"
+          value={pickChoice}
+          onChange={setPickChoice}
+          className="submit-picker"
+          options={[
+            ...(localSubs.length ? [{
+              label: 'Your submissions in this browser',
+              options: localSubs.map((s, i) => ({
+                value: `local:${i}`,
+                label: `${s.compoundName}: ${(s.accessions ?? [s.accession]).join(', ')} (${s.submittedAt?.slice(0, 10) ?? ''})`,
+              })),
+            }] : []),
+            ...(dbRecords?.length ? [{
+              label: 'Records in RiPPository',
+              options: dbRecords.map((r) => ({ value: `db:${r.accession}`, label: `${r.accession}: ${r.title}` })),
+            }] : []),
+          ]}
+        />
+        {dbError && (
+          <div style={{ marginTop: 8, fontSize: 12, color: '#b45309' }}>
+            The records in RiPPository could not be loaded just now; your own submissions are still listed.
+          </div>
         )}
       </Modal>
 
+      <Modal
+        open={outcome !== null}
+        title={outcome?.ok ? 'Submitted for review' : 'Not submitted'}
+        onCancel={() => setOutcome(null)}
+        width={620}
+        footer={outcome?.ok ? [
+          <Button key="again" onClick={() => {
+            const sub = outcome.sub;
+            setOutcome(null);
+            applyPrefill(prefillFromSubmission(sub), `your submission of ${sub.compoundName}`);
+          }}>
+            Submit another, starting from this one
+          </Button>,
+          <Button key="done" type="primary" onClick={() => setOutcome(null)}>Done</Button>,
+        ] : [
+          <Button key="back" type="primary" onClick={() => setOutcome(null)}>Back to the form</Button>,
+        ]}
+      >
+        {outcome?.ok ? (
+          <>
+            <p>
+              Thank you. Your {outcome.accessions.length > 1 ? 'records are' : 'record is'}{' '}
+              <strong>{outcome.accessions.join(', ')}</strong>.{' '}
+              {outcome.accessions.length > 1 ? 'They' : 'It'} will appear in RiPPository once a
+              curator has checked {outcome.accessions.length > 1 ? 'them' : 'it'}.
+            </p>
+            <p style={{ marginBottom: 0 }}>
+              Review: <a href={outcome.prUrl} target="_blank" rel="noreferrer">{outcome.prUrl}</a>. You can
+              also follow it under More → Submissions in this browser.
+            </p>
+          </>
+        ) : outcome ? (
+          <>
+            <p style={{ color: '#b91c1c' }}>{outcome.error}</p>
+            <p style={{ marginBottom: 0 }}>
+              Nothing was submitted and your form is unchanged. If this keeps happening, please
+              contact <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
+            </p>
+          </>
+        ) : null}
+      </Modal>
+
       <div style={{ maxWidth: 860, margin: '0 auto', padding: '32px 32px 64px' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 4 }}>
+        {onBack && (
+          <Button type="link" onClick={onBack} style={{ paddingLeft: 0, marginBottom: 8 }}>← Back</Button>
+        )}
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 4, gap: 12, flexWrap: 'wrap' }}>
           <h2 style={{ color: '#1e3a5f', marginBottom: 0 }}>Submit a RiPP Spectral Record</h2>
-          {allRecords.length > 0 && (
-            <Button
-              size="small"
-              onClick={() => setFillModalOpen(true)}
-              style={{ fontSize: 13, color: '#2563eb', borderColor: '#bfdbfe' }}
-            >
-              Pre-fill from existing record
-            </Button>
-          )}
+          <Button
+            size="small"
+            onClick={() => setPickerOpen(true)}
+            style={{ fontSize: 13, color: '#2563eb', borderColor: '#bfdbfe' }}
+          >
+            Start from an earlier submission
+          </Button>
         </div>
         <Form form={form} layout="vertical" requiredMark={false}>
 
-          <Divider orientation="left">
+          <Divider titlePlacement="start">
             <span style={{ color: '#2563eb', fontWeight: 600, fontSize: 14 }}>Part 1: Compound</span>
           </Divider>
 
@@ -1322,26 +1330,6 @@ function SubmitView() {
               addonBefore="orcid.org/"
               style={{ maxWidth: 420 }}
               onBlur={fetchOrcidName}
-            />
-          </Form.Item>
-
-          <Form.Item
-            label="Contact Email"
-            name="contactEmail"
-            rules={[
-              req('Contact email'),
-              { type: 'email', message: 'Enter a valid email address.' },
-            ]}
-            extra={
-              <span style={{ fontSize: 12, color: '#6b7280' }}>
-                Used only to contact you about your submission. Not displayed publicly.
-              </span>
-            }
-          >
-            <Input
-              placeholder="your@email.com"
-              type="email"
-              style={{ maxWidth: 420 }}
             />
           </Form.Item>
 
@@ -1435,12 +1423,12 @@ function SubmitView() {
             <Input placeholder="e.g. ITSIISLCTPGCKTGALMGCNMKTATCHCSIHVSK" style={{ fontFamily: 'monospace' }} />
           </Form.Item>
 
-          <Divider orientation="left">
+          <Divider titlePlacement="start">
             <span style={{ color: '#2563eb', fontWeight: 600, fontSize: 14 }}>Part 2: Spectra</span>
           </Divider>
 
           {spectra.map((s, idx) => (
-            <SpectrumCard key={idx} idx={idx} entry={s}
+            <SpectrumCard key={idx} idx={idx} entry={s} exactMass={exactMass}
               onChange={(updates) => updateSpectrum(idx, updates)}
               onRemove={() => removeSpectrum(idx)}
               canRemove={spectra.length > 1} />
@@ -1449,7 +1437,7 @@ function SubmitView() {
             + Add another spectrum
           </Button>
 
-          <Divider orientation="left">
+          <Divider titlePlacement="start">
             <span style={{ color: '#6b7280', fontWeight: 600, fontSize: 14 }}>Extra Information (Optional)</span>
           </Divider>
 
@@ -1624,7 +1612,7 @@ function SubmitView() {
           <Card title={<span style={{ color: '#2563eb', fontSize: 13 }}>Auto-calculated Fields</span>}
             size="small" style={{ backgroundColor: '#f0f9ff', borderColor: '#bfdbfe', marginBottom: 24 }}>
             <Row gutter={[16, 6]} style={{ fontSize: 12, color: '#374151' }}>
-              <Col span={12}><strong>Accession:</strong> {accessionRef.current}</Col>
+              <Col span={12}><strong>Accession:</strong> given when you submit, one per spectrum</Col>
               <Col span={12}><strong>Date:</strong> {today}</Col>
               <Col span={12}>
                 <strong>Exact Mass:</strong>{' '}
@@ -1632,7 +1620,7 @@ function SubmitView() {
               </Col>
               <Col span={12}><strong>License:</strong> CC BY-SA</Col>
               <Col span={12}><strong>Spectra:</strong> {spectra.length}</Col>
-              <Col span={12}><strong>SPLASH:</strong> <span style={{ color: '#9ca3af' }}>calculated upon review</span></Col>
+              <Col span={12}><strong>SPLASH:</strong> <span style={{ color: '#9ca3af' }}>calculated when you submit</span></Col>
               <Col span={24}>
                 <strong>DOIs:</strong>{' '}
                 {dois.filter((d) => d.trim()).length > 0

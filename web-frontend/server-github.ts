@@ -1,40 +1,59 @@
 // GitHub calls for the Submit page, made by the site's own server so the key never reaches a
 // browser. The key is read at run time from GITHUB_TOKEN; it is never built into the client code.
+import {
+  NEW_ACCESSION,
+  checkRecord,
+} from './src/elements/routes/pages/submit/massbankRecord.js';
 
-export type GitHubConfig = {
-  token: string;
+export type RepoConfig = {
   owner: string;
   repo: string;
   base: string;
 };
 
+export type GitHubConfig = RepoConfig & { token: string };
+
 export type Submission = {
-  accession: string;
   compoundName: string;
   compoundClass: string;
   compoundSubClass?: string;
   formula: string;
+  orcid: string;
+  orcidName?: string;
   submittedAt: string;
-  record: string;
+  records: string[];
 };
 
 type Fetch = typeof fetch;
 
-const ACCESSION = /^[A-Z0-9-]{3,40}$/;
+export const ACCESSION_PREFIX = 'RIPPOS-LU-';
+const ACCESSION = /^RIPPOS-LU-\d{4,6}$/;
+const ORCID = /^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/;
 const MAX_RECORD = 1_000_000;
+const MAX_SPECTRA = 20;
 const MAX_FIELD = 300;
+const DATA_DIR = 'RiPP-data';
+
+function repoOf(env: NodeJS.ProcessEnv): RepoConfig {
+  return {
+    owner: (env.GITHUB_OWNER ?? '').trim() || 'Joelle-Mer',
+    repo: (env.GITHUB_DATA_REPO ?? '').trim() || 'RiPPository-data',
+    base: (env.GITHUB_BASE_BRANCH ?? '').trim() || 'main',
+  };
+}
 
 export function githubConfig(env: NodeJS.ProcessEnv): GitHubConfig | null {
   const token = (env.GITHUB_TOKEN ?? '').trim();
   if (!token) {
     return null;
   }
-  return {
-    token,
-    owner: (env.GITHUB_OWNER ?? '').trim() || 'Joelle-Mer',
-    repo: (env.GITHUB_DATA_REPO ?? '').trim() || 'RiPPository-data',
-    base: (env.GITHUB_BASE_BRANCH ?? '').trim() || 'main',
-  };
+  return { token, ...repoOf(env) };
+}
+
+// reading the public data repository needs no key; the key, when there is one, raises the limit
+export function readConfig(env: NodeJS.ProcessEnv): RepoConfig & { token?: string } {
+  const token = (env.GITHUB_TOKEN ?? '').trim();
+  return { ...repoOf(env), ...(token ? { token } : {}) };
 }
 
 // one line of plain text, so a field cannot add lines to a title or a table
@@ -53,35 +72,55 @@ export function checkSubmission(body: unknown): Submission | string {
     return 'The submission is empty.';
   }
   const b = body as Record<string, unknown>;
-  if (typeof b.accession !== 'string' || !ACCESSION.test(b.accession)) {
-    return 'The accession is not valid.';
+  if (
+    !Array.isArray(b.records) ||
+    b.records.length === 0 ||
+    b.records.length > MAX_SPECTRA
+  ) {
+    return `A submission holds between 1 and ${MAX_SPECTRA} spectra.`;
   }
-  if (typeof b.record !== 'string' || b.record.trim().length === 0) {
-    return 'The record is empty.';
-  }
-  if (b.record.length > MAX_RECORD) {
-    return 'The record is too long.';
+  for (const [i, record] of b.records.entries()) {
+    const which = b.records.length > 1 ? `Spectrum ${i + 1}: ` : '';
+    if (typeof record !== 'string' || record.trim().length === 0) {
+      return which + 'The record is empty.';
+    }
+    if (record.length > MAX_RECORD) {
+      return which + 'The record is too long.';
+    }
+    // the server gives the accession; a record may not choose its own
+    if (!record.startsWith(`ACCESSION: ${NEW_ACCESSION}\n`)) {
+      return which + 'The record must start without an accession.';
+    }
+    const problem = checkRecord(record);
+    if (problem) {
+      return which + problem;
+    }
   }
   const compoundName = oneLine(b.compoundName);
   if (!compoundName) {
     return 'The compound name is missing.';
   }
+  const orcid = oneLine(b.orcid, 19);
+  if (!ORCID.test(orcid)) {
+    return 'The ORCID iD is not valid.';
+  }
   const submittedAt = oneLine(b.submittedAt, 40);
   return {
-    accession: b.accession,
     compoundName,
     compoundClass: oneLine(b.compoundClass),
     compoundSubClass: oneLine(b.compoundSubClass) || undefined,
     formula: oneLine(b.formula),
+    orcid,
+    orcidName: oneLine(b.orcidName) || undefined,
     submittedAt: Number.isNaN(Date.parse(submittedAt))
       ? new Date().toISOString()
       : submittedAt,
-    record: b.record,
+    records: b.records as string[],
   };
 }
 
-const headersFor = (cfg: GitHubConfig) => ({
-  Authorization: `token ${cfg.token}`,
+const headersFor = (token?: string) => ({
+  ...(token ? { Authorization: `token ${token}` } : {}),
   Accept: 'application/vnd.github.v3+json',
   'Content-Type': 'application/json',
   'User-Agent': 'RiPPository-site',
@@ -95,60 +134,122 @@ async function expectOk(res: Response, step: string) {
   return res.json();
 }
 
-// a branch, the record file on it, and a pull request; returns the pull request's address
+export const accessionFor = (n: number) =>
+  ACCESSION_PREFIX + String(n).padStart(4, '0');
+
+// every number already taken: records on the main branch, and the range each submission branch
+// holds (submission/rippos-lu-0010 or submission/rippos-lu-0010-0012); older branches end in a
+// 14-digit time, which is not a number
+export function takenNumbers(files: string[], branches: string[]): number[] {
+  const taken: number[] = [];
+  for (const f of files) {
+    const m = /^RIPPOS-LU-(\d+)\.txt$/i.exec(f);
+    if (m) taken.push(Number(m[1]));
+  }
+  for (const b of branches) {
+    const m = /submission\/rippos-lu-(\d+)(?:-(\d+))?$/i.exec(b);
+    if (!m) continue;
+    const first = Number(m[1]);
+    const last = m[2] && m[2].length < 8 ? Number(m[2]) : first;
+    for (let n = first; n <= Math.max(first, last); n++) taken.push(n);
+  }
+  return taken;
+}
+
+const branchFor = (first: number, count: number) =>
+  `submission/${accessionFor(first).toLowerCase()}` +
+  (count > 1 ? `-${String(first + count - 1).padStart(4, '0')}` : '');
+
+// accessions for the records, a branch holding them, and a pull request; the branch's name is the
+// claim on the numbers, so two submissions at once cannot be given the same one
 export async function openSubmissionPr(
   sub: Submission,
   cfg: GitHubConfig,
   fetchImpl: Fetch = fetch,
-  now: Date = new Date(),
-): Promise<string> {
-  const headers = headersFor(cfg);
+): Promise<{ prUrl: string; accessions: string[] }> {
+  const headers = headersFor(cfg.token);
   const apiBase = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}`;
 
   const ref = await expectOk(
     await fetchImpl(`${apiBase}/git/ref/heads/${cfg.base}`, { headers }),
     'Reading the base branch',
   );
-  // the time keeps two submissions with the same accession on separate branches
-  const stamp = now.toISOString().replace(/\D/g, '').slice(0, 14);
-  const branch = `submission/${sub.accession.toLowerCase()}-${stamp}`;
-  await expectOk(
-    await fetchImpl(`${apiBase}/git/refs`, {
+  const files = (await expectOk(
+    await fetchImpl(`${apiBase}/contents/${DATA_DIR}?ref=${cfg.base}`, { headers }),
+    'Reading the records',
+  )) as Array<{ name: string }>;
+  const branches = (await expectOk(
+    await fetchImpl(`${apiBase}/git/matching-refs/heads/submission/`, { headers }),
+    'Reading the open submissions',
+  )) as Array<{ ref: string }>;
+  const count = sub.records.length;
+  let first =
+    Math.max(
+      0,
+      ...takenNumbers(
+        files.map((f) => f.name),
+        branches.map((b) => b.ref),
+      ),
+    ) + 1;
+
+  let branch = '';
+  for (let attempt = 0; attempt < 5 && !branch; attempt++) {
+    const name = branchFor(first, count);
+    const res = await fetchImpl(`${apiBase}/git/refs`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({
-        ref: `refs/heads/${branch}`,
-        sha: ref.object.sha,
+      body: JSON.stringify({ ref: `refs/heads/${name}`, sha: ref.object.sha }),
+    });
+    if (res.status === 422) {
+      // someone took these numbers a moment ago
+      first += count;
+      continue;
+    }
+    await expectOk(res, 'Creating the branch');
+    branch = name;
+  }
+  if (!branch) {
+    throw new Error('Could not reserve an accession number; please try again.');
+  }
+
+  const accessions = sub.records.map((_, i) => accessionFor(first + i));
+  for (const [i, record] of sub.records.entries()) {
+    const text = record.replace(
+      `ACCESSION: ${NEW_ACCESSION}\n`,
+      `ACCESSION: ${accessions[i]}\n`,
+    );
+    await expectOk(
+      await fetchImpl(`${apiBase}/contents/${DATA_DIR}/${accessions[i]}.txt`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({
+          message: `submission: ${sub.compoundName} (${accessions[i]})`,
+          content: Buffer.from(text, 'utf-8').toString('base64'),
+          branch,
+        }),
       }),
-    }),
-    'Creating the branch',
-  );
-  await expectOk(
-    await fetchImpl(`${apiBase}/contents/RiPP-data/${sub.accession}.txt`, {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify({
-        message: `submission: ${sub.compoundName} (${sub.accession})`,
-        content: Buffer.from(sub.record, 'utf-8').toString('base64'),
-        branch,
-      }),
-    }),
-    'Adding the record',
-  );
+      'Adding the record',
+    );
+  }
+
   const submitted = new Date(sub.submittedAt).toLocaleDateString('en-GB', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
   });
+  const named =
+    count > 1 ? `${accessions[0]} to ${accessions[count - 1]}` : accessions[0];
   const body = [
     `## New RiPP Submission`,
     ``,
     `| Field | Value |`,
     `|-------|-------|`,
-    `| **Accession** | \`${sub.accession}\` |`,
+    `| **Accession${count > 1 ? 's' : ''}** | ${accessions.map((a) => `\`${a}\``).join(', ')} |`,
+    `| **Spectra** | ${count} |`,
     `| **Compound** | ${sub.compoundName} |`,
     `| **Class** | ${sub.compoundClass}${sub.compoundSubClass ? ' / ' + sub.compoundSubClass : ''} |`,
     `| **Formula** | ${sub.formula} |`,
+    `| **Submitted by** | ${sub.orcidName ? sub.orcidName + ', ' : ''}[${sub.orcid}](https://orcid.org/${sub.orcid}) |`,
     `| **Submitted** | ${submitted} |`,
     ``,
     `*Submitted via the RiPPository web form.*`,
@@ -158,7 +259,7 @@ export async function openSubmissionPr(
       method: 'POST',
       headers,
       body: JSON.stringify({
-        title: `[Submission] ${sub.compoundName} (${sub.accession})`,
+        title: `[Submission] ${sub.compoundName} (${named})`,
         body,
         head: branch,
         base: cfg.base,
@@ -166,7 +267,7 @@ export async function openSubmissionPr(
     }),
     'Opening the pull request',
   );
-  return pr.html_url as string;
+  return { prUrl: pr.html_url as string, accessions };
 }
 
 export type PrState = 'Approved' | 'Rejected' | 'Pending';
@@ -179,7 +280,7 @@ export async function prStatus(
 ): Promise<PrState> {
   const res = await fetchImpl(
     `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/pulls/${number}`,
-    { headers: headersFor(cfg) },
+    { headers: headersFor(cfg.token) },
   );
   if (!res.ok) {
     return 'Pending';
@@ -189,6 +290,71 @@ export async function prStatus(
     return 'Approved';
   }
   return data.state === 'closed' ? 'Rejected' : 'Pending';
+}
+
+export type RecordEntry = { accession: string; title: string };
+
+// the records on the main branch of the data repository, for starting a submission from one; the
+// listing is kept for a minute and each file by its content hash, so GitHub is asked rarely
+export function recordReader(
+  cfg: RepoConfig & { token?: string },
+  fetchImpl: Fetch = fetch,
+  listFor = 60_000,
+) {
+  const texts = new Map<string, string>();
+  let listing: { at: number; files: Array<{ name: string; sha: string; download_url: string }> } | null =
+    null;
+
+  async function files(now: number) {
+    if (listing && now - listing.at < listFor) return listing.files;
+    const res = await fetchImpl(
+      `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${DATA_DIR}?ref=${cfg.base}`,
+      { headers: headersFor(cfg.token) },
+    );
+    const found = (await expectOk(res, 'Reading the records')) as Array<{
+      name: string;
+      sha: string;
+      download_url: string;
+    }>;
+    listing = {
+      at: now,
+      files: found.filter((f) => ACCESSION.test(f.name.replace(/\.txt$/, ''))),
+    };
+    return listing.files;
+  }
+
+  async function text(file: { sha: string; download_url: string }) {
+    const kept = texts.get(file.sha);
+    if (kept !== undefined) return kept;
+    const res = await fetchImpl(file.download_url, {
+      headers: { 'User-Agent': 'RiPPository-site' },
+    });
+    if (!res.ok) {
+      throw new Error(`Reading a record failed (GitHub answered ${res.status}).`);
+    }
+    const got = await res.text();
+    texts.set(file.sha, got);
+    return got;
+  }
+
+  return {
+    async list(now = Date.now()): Promise<RecordEntry[]> {
+      const all = await files(now);
+      const entries = await Promise.all(
+        all.map(async (f) => {
+          const t = await text(f);
+          const title = /^RECORD_TITLE:\s*(.*)$/m.exec(t)?.[1]?.trim() ?? '';
+          return { accession: f.name.replace(/\.txt$/, ''), title };
+        }),
+      );
+      return entries.sort((a, b) => a.accession.localeCompare(b.accession));
+    },
+    async get(accession: string, now = Date.now()): Promise<string | null> {
+      if (!ACCESSION.test(accession)) return null;
+      const file = (await files(now)).find((f) => f.name === `${accession}.txt`);
+      return file ? text(file) : null;
+    },
+  };
 }
 
 // at most `limit` calls per key in any `windowMs`, kept in memory

@@ -19,6 +19,8 @@ import {
   openSubmissionPr,
   prStatus,
   rateLimiter,
+  readConfig,
+  recordReader,
 } from './server-github.js';
 
 // Constants
@@ -324,7 +326,7 @@ baseRouter.post(
       return;
     }
     try {
-      res.json({ prUrl: await openSubmissionPr(sub, github) });
+      res.json(await openSubmissionPr(sub, github));
     } catch (e) {
       console.error('GitHub submission failed:', e);
       res
@@ -348,6 +350,42 @@ baseRouter.get(
       res.json({ status: await prStatus(number, github) });
     } catch {
       res.json({ status: 'Pending' });
+    }
+  },
+);
+
+// the records already in the data repository, so a new submission can start from one
+const records = recordReader(readConfig(process.env));
+const readsAllowed = rateLimiter(120, 60 * 60 * 1000);
+baseRouter.get('/submit-api/records', async (req: Request, res: Response) => {
+  if (!readsAllowed(req.ip ?? 'unknown')) {
+    res.status(429).json({ error: 'Too many requests; please try again later.' });
+    return;
+  }
+  try {
+    res.json(await records.list());
+  } catch (e) {
+    console.error('Listing records failed:', e);
+    res.status(502).json({ error: 'The records could not be read.' });
+  }
+});
+baseRouter.get(
+  '/submit-api/records/:accession',
+  async (req: Request, res: Response) => {
+    if (!readsAllowed(req.ip ?? 'unknown')) {
+      res.status(429).json({ error: 'Too many requests; please try again later.' });
+      return;
+    }
+    try {
+      const text = await records.get(String(req.params.accession));
+      if (text === null) {
+        res.status(404).json({ error: 'No such record.' });
+        return;
+      }
+      res.json({ text });
+    } catch (e) {
+      console.error('Reading a record failed:', e);
+      res.status(502).json({ error: 'The record could not be read.' });
     }
   },
 );
