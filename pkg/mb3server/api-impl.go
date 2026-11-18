@@ -501,6 +501,14 @@ func GetRecord(accession string) (*MbRecord, error) {
 		return nil, err
 	}
 
+	// The database has no tables for SP$ lines, so the record rebuilt from its tables carries no
+	// organism, strain or sample. The full record stored at load time does; take them from there.
+	if stored, err := db.GetRecords(&[]string{accession}); err == nil && stored != nil && len(*stored) == 1 {
+		if full, err := ConvertJsonStringToMb3Record((*stored)[0]); err == nil {
+			result.Species = full.Species
+		}
+	}
+
 	return result, nil
 }
 
