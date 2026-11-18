@@ -310,8 +310,28 @@ describe('profile data sent to the server', () => {
     expect(above(rec)).toEqual(above(profileRecord));
   });
 
-  it('leaves a peak list exactly as it came', async () => {
+  it('leaves a peak list as it came, apart from the SPLASH the server sets', async () => {
     const sub = await prepareSubmission({ ...good, records });
-    expect((sub as { records: string[] }).records).toEqual(records);
+    const noSplash = (r: string) => r.split('\n').filter((l) => !l.startsWith('PK$SPLASH:'));
+    expect((sub as { records: string[] }).records.map(noSplash)).toEqual(records.map(noSplash));
+  });
+});
+
+describe('the SPLASH of a submitted record', () => {
+  // the reference implementation's code (spectra-hash, python) for peaks 100.5:50 and 150.25:999
+  const REFERENCE = 'splash10-0udi-0900000000-1509cff7874978a0a9d8';
+
+  it('is computed by the server from the peaks, replacing what the record carried', async () => {
+    const one = formatRecords(fields, [{ ...spectrum('Bruker maXis Impact', '20 eV'), splash: 'splash10-a5d6abe3d2-333ab93682-693949c323' }])[0];
+    expect(one).toContain('PK$SPLASH: splash10-a5d6abe3d2-333ab93682-693949c323');
+    const rec = ((await prepareSubmission({ ...good, records: [one] })) as { records: string[] }).records[0];
+    expect(rec.split('\n').filter((l) => l.startsWith('PK$SPLASH:'))).toEqual([`PK$SPLASH: ${REFERENCE}`]);
+  });
+
+  it('is added when a record has none', async () => {
+    const none = formatRecords(fields, [spectrum('Bruker maXis Impact', '20 eV')])[0];
+    expect(none).not.toContain('PK$SPLASH');
+    const rec = ((await prepareSubmission({ ...good, records: [none] })) as { records: string[] }).records[0];
+    expect(rec).toContain(`\nPK$SPLASH: ${REFERENCE}\nPK$NUM_PEAK: 2\n`);
   });
 });

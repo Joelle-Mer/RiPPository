@@ -335,6 +335,27 @@ export async function centroidRecord(text: string): Promise<string> {
   return [...head, lines[at], ...peakLines, ...lines.slice(end)].join('\n');
 }
 
+// A record with its PK$SPLASH computed from its own peaks, replacing whatever it carried, so every
+// record the server accepts has the standard SPLASH, also one sent from an old copy of the page.
+export async function withSplash(text: string): Promise<string> {
+  const lines = text.replace(/\r\n/g, '\n').split('\n');
+  const at = lines.findIndex((l) => l.startsWith('PK$PEAK:'));
+  if (at < 0) return text;
+  const peaks: Array<{ mz: number; intensity: number }> = [];
+  for (let k = at + 1; k < lines.length && lines[k].startsWith('  '); k++) {
+    const [mz, intensity] = lines[k].trim().split(' ');
+    if (!NUMBER.test(mz ?? '') || !NUMBER.test(intensity ?? '')) return text; // checkRecord names it
+    peaks.push({ mz: Number(mz), intensity: Number(intensity) });
+  }
+  const splash = await calculateSplash(peaks).catch(() => '');
+  if (!splash) return text;
+  const line = `PK$SPLASH: ${splash}`;
+  const old = lines.findIndex((l) => l.startsWith('PK$SPLASH:'));
+  if (old >= 0) lines[old] = line;
+  else lines.splice(lines.findIndex((l) => l.startsWith('PK$NUM_PEAK:') || l.startsWith('PK$PEAK:')), 0, line);
+  return lines.join('\n');
+}
+
 export type ReadRecord = {
   accession: string;
   title: string;

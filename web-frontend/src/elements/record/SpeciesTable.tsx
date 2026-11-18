@@ -15,6 +15,13 @@ type InputProps = {
 
 function SpeciesTable({ species, width, height }: InputProps) {
   return useMemo(() => {
+    // the server sends the strain as a lineage line ("strain: NIES-298"), not as a field of its own
+    const strain =
+      species?.strain ||
+      species?.lineage
+        ?.find((l) => /^strain:/i.test(l))
+        ?.replace(/^strain:\s*/i, '') ||
+      '';
     const columns = [
       {
         title: 'Parameter',
@@ -48,12 +55,12 @@ function SpeciesTable({ species, width, height }: InputProps) {
       {
         key: '2',
         parameter: 'Strain',
-        value: species?.strain ? (
+        value: strain ? (
           <ExportableContent
             mode="copy"
-            component={species.strain}
+            component={strain}
             title="Copy strain to clipboard"
-            onClick={() => copyTextToClipboard('Strain', species.strain!)}
+            onClick={() => copyTextToClipboard('Strain', strain)}
           />
         ) : (
           <NotAvailableLabel />
