@@ -2,6 +2,7 @@
 // browser. The key is read at run time from GITHUB_TOKEN; it is never built into the client code.
 import {
   NEW_ACCESSION,
+  centroidRecord,
   checkRecord,
 } from './src/elements/routes/pages/submit/massbankRecord.js';
 
@@ -117,6 +118,22 @@ export function checkSubmission(body: unknown): Submission | string {
       : submittedAt,
     records: b.records as string[],
   };
+}
+
+// what the server does with a submission: profile data is converted to peaks first, as the Submit
+// page does, so a spectrum is never turned away for being profile data; then everything is checked
+export async function prepareSubmission(body: unknown): Promise<Submission | string> {
+  if (typeof body === 'object' && body !== null) {
+    const b = body as Record<string, unknown>;
+    if (Array.isArray(b.records) && b.records.length <= MAX_SPECTRA) {
+      b.records = await Promise.all(
+        b.records.map((r) =>
+          typeof r === 'string' && r.length <= MAX_RECORD ? centroidRecord(r) : r,
+        ),
+      );
+    }
+  }
+  return checkSubmission(body);
 }
 
 const headersFor = (token?: string) => ({

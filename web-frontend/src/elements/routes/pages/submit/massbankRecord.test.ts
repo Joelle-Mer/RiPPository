@@ -7,6 +7,7 @@ import {
   checkRecord,
   expectedPrecursorMz,
   formatRecords,
+  pdbIdsIn,
   readRecord,
   type RecordFields,
   type RecordSpectrum,
@@ -33,8 +34,13 @@ const fields: RecordFields = {
   note: 'Extracted in methanol.\nSample: freeze-dried cells\n\n',
   dbLinks: [{ db: 'PubChem CID', id: '5280805' }, { db: 'ChEBI', id: 'CHEBI:17234' }],
   bioactivity: [{ activity: 'Cytotoxic', target: 'HeLa', ic50: '5 uM' }],
-  origin: { organism: 'Microcystis aeruginosa', strain: 'NIES-298', source: 'Freshwater lake or river', geography: 'Lake Kasumigaura, Japan' },
+  origin: {
+    organism: 'Microcystis aeruginosa', strain: 'NIES-298', source: 'Freshwater lake or river',
+    geography: 'Lake Kasumigaura, Japan', production: 'Heterologous expression',
+    host: 'Escherichia coli BL21(DE3)',
+  },
   genome: { mibig: 'BGC0000473', genbank: 'AM774406.1' },
+  pdb: ['7ZWJ', '2MMW'],
 };
 const spectrum = (instrument: string, ce: string, peaks: number[][]): RecordSpectrum => ({
   instrument, instrumentType: 'LC-ESI-QTOF', msType: 'MS2', ionMode: 'POSITIVE', ionization: 'ESI',
@@ -120,6 +126,7 @@ describe('records the database loader reads', () => {
     ['a settings line without a value', (r: string) => r.replace('MS_TYPE MS2', 'MS_TYPE'), /needs a name and a value/],
     ['a missing tag', (r: string) => r.replace(/^CH\$FORMULA: .*\n/m, ''), /CH\$FORMULA is missing/],
     ['a bad date', (r: string) => r.replace('DATE: 2026.11.16', 'DATE: 16-11-2026'), /YYYY\.MM\.DD/],
+    ['a peak of zero intensity', (r: string) => r.replace('  303.0500 10000.0000 999', '  303.0500 0.0000 0'), /intensity above zero/],
   ])('refuses %s', (_name, spoil, why) => {
     const spoiled = spoil(two[0]);
     expect(spoiled).not.toBe(two[0]);
@@ -133,7 +140,7 @@ describe('records the database loader reads', () => {
       formula: 'C24H34N6O4S2', exactMass: 534.2083, smiles: 'CC(=O)N', inchi: fields.inchi,
       precursorSeq: 'ITGCIC', dois: fields.dois, note: 'Extracted in methanol.\nSample: freeze-dried cells',
       dbLinks: fields.dbLinks, bioactivity: [{ activity: 'Cytotoxic', target: 'HeLa', ic50: '5 uM' }],
-      origin: fields.origin, genome: fields.genome,
+      origin: fields.origin, genome: fields.genome, pdb: ['7ZWJ', '2MMW'],
     });
     expect(back.spectrum).toEqual({
       instrument: 'Thermo Q Exactive', instrumentType: 'LC-ESI-QTOF', msType: 'MS2', ionMode: 'POSITIVE',
@@ -158,6 +165,43 @@ describe('records the database loader reads', () => {
     // and the precursor the formula predicts is the one written in that record
     const written = Number(/PRECURSOR_M\/Z (\S+)/.exec(text)![1]);
     expect(Math.abs(expectedPrecursorMz(r.fields.exactMass!, '[M+H]+')! - written)).toBeLessThan(0.0005);
+  });
+
+  it('says how the compound was made, apart from where its gene cluster comes from', () => {
+    expect(two[0]).toContain('SP$SCIENTIFIC_NAME: Microcystis aeruginosa\n');
+    expect(two[0]).toContain('SP$SAMPLE: Production: Heterologous expression\n');
+    expect(two[0]).toContain('SP$SAMPLE: Expression host: Escherichia coli BL21(DE3)\n');
+    expect(two[0]).not.toContain('Enzymes');
+    const vitro = formatRecords({ ...fields, origin: { production: 'In vitro enzymatic modification', enzymes: 'LasB, LasC' } },
+      [spectrum('X', '30 NCE', [[1, 1, 1]])])[0];
+    expect(checkRecord(vitro)).toBeNull();
+    expect(readRecord(vitro).fields.origin).toEqual({ production: 'In vitro enzymatic modification', enzymes: 'LasB, LasC' });
+    expect(vitro).toContain('AC$MASS_SPECTROMETRY: COLLISION_ENERGY 30 NCE');
+  });
+
+  it('writes PDB identifiers as comments, and reads them back from a note too', () => {
+    expect(two[0]).toContain('COMMENT: PDB 7ZWJ\nCOMMENT: PDB 2MMW\n');
+    const bad = formatRecords({ ...fields, pdb: ['7zwj', 'not-an-id'] }, [spectrum('X', '20 eV', [[1, 1, 1]])])[0];
+    expect(bad).toContain('COMMENT: PDB 7ZWJ');
+    expect(bad).not.toContain('not-an-id');
+    // the way the first lasso submissions gave it, in the notes
+    const noted = formatRecords({ ...fields, pdb: undefined, note: 'PDB ID: 7ZWJ' }, [spectrum('X', '20 eV', [[1, 1, 1]])])[0];
+    expect(readRecord(noted).fields.pdb).toEqual(['7ZWJ']);
+    expect(pdbIdsIn('PDB ID: 7ZWJ')).toEqual(['7ZWJ']);
+    expect(pdbIdsIn('PDB 7zwj, 2MMW')).toEqual(['7ZWJ', '2MMW']);
+    expect(pdbIdsIn('PDB structures were not solved')).toEqual([]);
+    expect(pdbIdsIn('Extracted in methanol.')).toEqual([]);
+  });
+
+  it('records that peaks were converted from profile data, and refuses profile data left as it was', () => {
+    const conv = formatRecords(fields, [{ ...spectrum('X', '20 eV', [[100, 5, 5], [200, 10, 10]]),
+      processing: 'FIND_PEAK centroided from profile data on submission to RiPPository (40 points, 2 peaks)' }])[0];
+    expect(checkRecord(conv)).toBeNull();
+    expect(conv).toContain('MS$DATA_PROCESSING: FIND_PEAK centroided from profile data');
+    // a peak sampled as seven points 0.004 Da apart, as the first lasso submissions came
+    const run = Array.from({ length: 7 }, (_, k) => [500 + k * 0.004, 100 + 50 * (3 - Math.abs(k - 3)), 1]);
+    const prof = formatRecords(fields, [spectrum('X', '20 eV', [...run, ...run.map(([m, i, r]) => [m + 10, i, r])])])[0];
+    expect(checkRecord(prof)).toMatch(/profile data/);
   });
 
   it('predicts the precursor m/z of each ion type', () => {

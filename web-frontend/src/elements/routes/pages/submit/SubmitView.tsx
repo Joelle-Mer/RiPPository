@@ -4,9 +4,10 @@ import { Content } from 'antd/es/layout/layout';
 import { usePropertiesContext } from '../../../../context/properties/properties';
 import { calculateExactMass, calculateSplash, parsePeakList } from '../../../../utils/chemistry';
 import {
-  checkRecord, expectedPrecursorMz, formatRecords, readRecord,
+  PDB_PATTERN, PRODUCTION_METHODS, checkRecord, expectedPrecursorMz, formatRecords, pdbUrl, readRecord,
   type RecordFields, type SpectrumSettings,
 } from './massbankRecord';
+import { processingNote, toPeakList } from './centroid';
 import { SmilesParser } from 'openchemlib';
 import { MolfileSvgRenderer } from 'react-ocl';
 
@@ -41,6 +42,7 @@ function prefillFromSubmission(s: RiPPSubmission): Prefill {
       formula: s.formula, smiles: s.smiles, precursorSeq: s.precursorSeq, dois: s.dois ?? [],
       note: s.note, dbLinks: s.dbLinks, bioactivity: s.bioactivity, origin: s.origin,
       genome: s.genome ? { mibig: s.genome.mibig, genbank: s.genome.genbank } : undefined,
+      pdb: s.pdb,
     },
     spectra,
     orcid: s.orcid,
@@ -86,8 +88,9 @@ export type RiPPSubmission = {
   note?: string;
   dbLinks?: Array<{ db: string; id: string }>;
   bioactivity?: Array<{ activity: string; target?: string; mic?: string; ic50?: string }>;
-  origin?: { organism?: string; strain?: string; source?: string; geography?: string };
+  origin?: RecordFields['origin'];
   genome?: { mibig?: string; genbank?: string; bgcStart?: number; bgcEnd?: number };
+  pdb?: string[];
   prUrl?: string;
   // one accession per spectrum, given by the server; accession is the first of them
   accessions?: string[];
@@ -152,8 +155,13 @@ const RIPP_SUBCLASSES: Record<string, string[]> = {
 const INSTRUMENTS = [
   'API QSTAR Pulsar i',
   'Bruker micrOTOF-Q II', 'Bruker timsTOF Pro', 'Bruker maXis Impact',
-  'Thermo Q Exactive', 'Thermo Q Exactive Plus', 'Thermo Q Exactive HF',
-  'Thermo Orbitrap Fusion Lumos', 'Thermo LTQ Orbitrap XL', 'Thermo TSQ Quantiva',
+  'Bruker impact II', 'Bruker timsTOF fleX', 'Bruker solariX',
+  'Thermo Q Exactive', 'Thermo Q Exactive Plus', 'Thermo Q Exactive HF', 'Thermo Q Exactive HF-X',
+  'Thermo Orbitrap Exploris 120', 'Thermo Orbitrap Exploris 240', 'Thermo Orbitrap Exploris 480',
+  'Thermo Orbitrap Astral', 'Thermo Orbitrap Eclipse', 'Thermo Orbitrap Fusion', 'Thermo Orbitrap ID-X',
+  'Thermo Orbitrap Fusion Lumos', 'Thermo LTQ Orbitrap XL', 'Thermo LTQ Orbitrap Velos', 'Thermo TSQ Quantiva',
+  'Agilent 6545 Q-TOF', 'Agilent 6546 Q-TOF',
+  'SCIEX X500R QTOF', 'SCIEX ZenoTOF 7600',
   'Waters Synapt G2-Si', 'Waters Xevo G2-XS QTof', 'Waters Acquity TQD',
   'Agilent 6530 Q-TOF', 'Agilent 6550 iFunnel Q-TOF', 'Agilent 6495 Triple Quad',
   'Shimadzu LCMS-8060', 'Shimadzu LCMS-8040', 'Shimadzu LCMS-8045',
@@ -172,7 +180,11 @@ const ION_MODES = ['POSITIVE', 'NEGATIVE'];
 
 const COLLISION_ENERGIES = [
   '10 eV', '15 eV', '20 eV', '25 eV', '30 eV',
-  '35 eV', '40 eV', '45 eV', '50 eV', 'Ramp 10-50 eV', 'Not reported',
+  '35 eV', '40 eV', '45 eV', '50 eV', 'Ramp 10-50 eV',
+  // normalised collision energy, as Thermo instruments set it
+  '15 NCE', '20 NCE', '25 NCE', '30 NCE', '35 NCE', '40 NCE', '45 NCE', '50 NCE',
+  'Stepped 20, 30, 40 NCE', 'Stepped 25, 35, 45 NCE',
+  'Not reported',
 ];
 
 const PRECURSOR_TYPES = [
@@ -301,6 +313,15 @@ const ISOLATION_SOURCES = [
 
 const OTHER = '__other__';
 
+// which production methods name an expression host, and which name enzymes
+const hostNeeded = (method?: string) => !!method && /heterologous/i.test(method);
+const enzymesNeeded = (method?: string) => !!method && /in vitro/i.test(method);
+
+// PDB identifiers typed as a list ("7ZWJ, 8ABC"); the ones not shaped like one are left for the
+// form's check to point out
+const splitPdb = (text?: string) => (text ?? '').split(/[\s,;]+/).map((s) => s.trim()).filter(Boolean);
+const pdbList = (text?: string) => splitPdb(text).filter((id) => PDB_PATTERN.test(id)).map((id) => id.toUpperCase());
+
 function defaultSpectrum(): SpectrumEntry {
   return {
     instrument: '', instrumentType: '', msType: 'MS2', ionMode: 'POSITIVE',
@@ -329,6 +350,70 @@ function parseMgf(text: string): Array<{ mz: number; intensity: number; rel: num
   if (raw.length === 0) return null;
   const maxInt = Math.max(...raw.map((p) => p.intensity));
   return raw.map((p) => ({ ...p, rel: Math.round((p.intensity / maxInt) * 999) }));
+}
+
+// the peaks of one spectrum as they will be written: profile data becomes a peak list (one m/z per
+// peak top) and zero-intensity points are left out
+function spectrumPeaks(s: SpectrumEntry) {
+  const raw = s.inputMode === 'peaks' ? parsePeakList(s.peakText) : (s.mgfContent ? parseMgf(s.mgfContent) : null);
+  if (!raw || raw.length === 0) return null;
+  const made = toPeakList(raw);
+  if (made.peaks.length === 0) return null;
+  const max = Math.max(...made.peaks.map((p) => p.intensity));
+  return {
+    raw,
+    converted: made.converted,
+    dropped: made.converted ? 0 : (made.dropped ?? 0),
+    peaks: made.peaks.map((p) => ({ mz: p.mz, intensity: p.intensity, rel: Math.round((p.intensity / max) * 999) })),
+  };
+}
+
+// the uploaded profile in grey with the peaks taken from it on top, so the conversion can be checked
+function ConversionPreview({ raw, peaks }: { raw: Array<{ mz: number; intensity: number }>; peaks: Array<{ mz: number; intensity: number }> }) {
+  const W = 640;
+  const H = 130;
+  const pts = [...raw].sort((a, b) => a.mz - b.mz);
+  const lo = pts[0].mz;
+  const hi = pts[pts.length - 1].mz;
+  const top = Math.max(...pts.map((p) => p.intensity), ...peaks.map((p) => p.intensity)) || 1;
+  const x = (mz: number) => 4 + ((mz - lo) / (hi - lo || 1)) * (W - 8);
+  const y = (i: number) => H - 14 - (i / top) * (H - 22);
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ marginTop: 8, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 6 }}
+      role="img" aria-label="Uploaded profile and the peaks taken from it">
+      <polyline fill="none" stroke="#9ca3af" strokeWidth={0.8} points={pts.map((p) => `${x(p.mz).toFixed(1)},${y(p.intensity).toFixed(1)}`).join(' ')} />
+      {peaks.map((p, i) => (
+        <line key={i} x1={x(p.mz)} x2={x(p.mz)} y1={y(0)} y2={y(p.intensity)} stroke="#2563eb" strokeWidth={1.2} />
+      ))}
+      <text x={4} y={H - 2} fontSize={10} fill="#6b7280">{lo.toFixed(1)}</text>
+      <text x={W - 4} y={H - 2} fontSize={10} fill="#6b7280" textAnchor="end">{hi.toFixed(1)} m/z</text>
+      <text x={W - 4} y={12} fontSize={10} fill="#6b7280" textAnchor="end">grey: as uploaded · blue: peaks in the record</text>
+    </svg>
+  );
+}
+
+function PeakStatus({ made, source }: { made: ReturnType<typeof spectrumPeaks>; source: string }) {
+  if (!made) return null;
+  if (made.converted) {
+    return (
+      <>
+        <div style={{ marginTop: 6, fontSize: 12, color: '#1d4ed8' }}>
+          This looks like profile data: {made.converted.points.toLocaleString()} points were turned into{' '}
+          {made.converted.peaks.toLocaleString()} peaks, one per peak top. The record will say the peaks were
+          converted here. If you have the raw file, the instrument maker&apos;s own centroiding is better:
+          for example ProteoWizard msconvert with <code>--mgf --filter &quot;peakPicking vendor msLevel=1-&quot;</code>,
+          then upload that MGF.
+        </div>
+        <ConversionPreview raw={made.raw} peaks={made.peaks} />
+      </>
+    );
+  }
+  return (
+    <div style={{ marginTop: 4, fontSize: 12, color: '#059669' }}>
+      {made.peaks.length} peak{made.peaks.length !== 1 ? 's' : ''} {source}
+      {made.dropped > 0 && <>; {made.dropped} row{made.dropped !== 1 ? 's' : ''} with zero intensity left out</>}
+    </div>
+  );
 }
 
 function SelectWithOther({
@@ -624,6 +709,7 @@ function SpectrumCard({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const parsedPeaks = useMemo(() => parsePeakList(entry.peakText), [entry.peakText]);
   const mgfPeaks = useMemo(() => (entry.mgfContent ? parseMgf(entry.mgfContent) : null), [entry.mgfContent]);
+  const made = useMemo(() => spectrumPeaks(entry), [entry]);
   const mgfInfo = useMemo(() => mgfHeader(entry.mgfContent), [entry.mgfContent]);
   const expected = expectedPrecursorMz(exactMass, entry.precursorType);
   const entered = Number(entry.precursorMz);
@@ -723,11 +809,7 @@ function SpectrumCard({
                 Invalid format: each line must be: m/z intensity (e.g. 303.05 10000)
               </div>
             )}
-            {parsedPeaks && (
-              <div style={{ marginTop: 4, fontSize: 12, color: '#059669' }}>
-                {parsedPeaks.length} peak{parsedPeaks.length !== 1 ? 's' : ''} parsed, relative intensities auto-calculated
-              </div>
-            )}
+            {parsedPeaks && <PeakStatus made={made} source="parsed, relative intensities calculated" />}
           </>
         ) : (
           <div>
@@ -754,11 +836,7 @@ function SpectrumCard({
             {entry.mgfFileName && (
               <span style={{ marginLeft: 12, fontSize: 12, color: '#374151' }}>{entry.mgfFileName}</span>
             )}
-            {entry.mgfContent && mgfPeaks && (
-              <div style={{ marginTop: 6, fontSize: 12, color: '#059669' }}>
-                {mgfPeaks.length} peak{mgfPeaks.length !== 1 ? 's' : ''} parsed from MGF
-              </div>
-            )}
+            {entry.mgfContent && mgfPeaks && <PeakStatus made={made} source="parsed from MGF" />}
             {entry.mgfContent && mgfInfo.count > 1 && (
               <div style={{ marginTop: 4, fontSize: 12, color: '#b45309' }}>
                 This file holds {mgfInfo.count} spectra; only the first is used. Add each other
@@ -889,6 +967,9 @@ function SubmitView({ startFromExisting = false, onBack }: { startFromExisting?:
   const formula = Form.useWatch('formula', form) as string | undefined;
   const compoundName = Form.useWatch('compoundName', form) as string | undefined;
   const selectedRippClass = Form.useWatch('compoundClass', form) as string | undefined;
+  const pdbText = Form.useWatch('pdb', form) as string | undefined;
+  const pdbIds = useMemo(() => pdbList(pdbText), [pdbText]);
+  const production = Form.useWatch('originProduction', form) as string | undefined;
   const exactMass = useMemo(() => (formula ? calculateExactMass(formula) : null), [formula]);
 
   const [mibigLoading, setMibigLoading] = useState(false);
@@ -1015,16 +1096,19 @@ function SubmitView({ startFromExisting = false, onBack }: { startFromExisting?:
           messageApi.error(`Spectrum ${i + 1}: please enter the measured precursor m/z.`); return;
         }
       }
-      const peaks = s.inputMode === 'peaks' ? parsePeakList(s.peakText) : parseMgf(s.mgfContent);
-      if (!peaks || peaks.length === 0) { messageApi.error(`Spectrum ${i + 1}: please provide valid peak data.`); return; }
+      if (!spectrumPeaks(s)) { messageApi.error(`Spectrum ${i + 1}: please provide valid peak data.`); return; }
     }
     setSubmitting(true);
     try {
-      const spectraWithPeaks = spectra.map((s) => ({
-        ...s,
-        precursorMz: s.msType === 'MS1' ? undefined : s.precursorMz?.trim(),
-        peaks: (s.inputMode === 'peaks' ? parsePeakList(s.peakText) : parseMgf(s.mgfContent)) ?? [],
-      }));
+      const spectraWithPeaks = spectra.map((s) => {
+        const made = spectrumPeaks(s);
+        return {
+          ...s,
+          precursorMz: s.msType === 'MS1' ? undefined : s.precursorMz?.trim(),
+          peaks: made?.peaks ?? [],
+          processing: made?.converted ? processingNote(made.converted) : undefined,
+        };
+      });
       const splashes = await Promise.all(spectraWithPeaks.map((s) => calculateSplash(s.peaks).catch(() => '')));
       const fields: RecordFields = {
         orcid: String(values.orcid).trim(),
@@ -1048,14 +1132,18 @@ function SubmitView({ startFromExisting = false, onBack }: { startFromExisting?:
         origin: {
           organism: sanitize(values.originOrganism) || undefined, strain: sanitize(values.originStrain) || undefined,
           source: sanitize(values.originSource) || undefined, geography: sanitize(values.originGeography) || undefined,
+          production: sanitize(values.originProduction) || undefined,
+          host: hostNeeded(values.originProduction) ? sanitize(values.originHost) || undefined : undefined,
+          enzymes: enzymesNeeded(values.originProduction) ? sanitize(values.originEnzymes) || undefined : undefined,
         },
         genome: { mibig: values.genomeMibig?.trim() || undefined, genbank: values.genomeGenbank?.trim() || undefined },
+        pdb: pdbList(values.pdb),
       };
       const records = formatRecords(fields, spectraWithPeaks.map((s, i) => ({
         instrument: s.instrument, instrumentType: s.instrumentType, msType: s.msType, ionMode: s.ionMode,
         ionization: s.ionization, precursorType: s.precursorType,
         collisionEnergy: s.msType === 'MS1' ? '' : s.collisionEnergy,
-        precursorMz: s.precursorMz, peaks: s.peaks, splash: splashes[i] || undefined,
+        precursorMz: s.precursorMz, peaks: s.peaks, splash: splashes[i] || undefined, processing: s.processing,
       })));
       // the same check the server makes, so a problem shows here, before anything is sent
       for (const [i, record] of records.entries()) {
@@ -1090,6 +1178,7 @@ function SubmitView({ startFromExisting = false, onBack }: { startFromExisting?:
         origin: Object.values(fields.origin ?? {}).some(Boolean) ? fields.origin : undefined,
         genome: fields.genome?.mibig || fields.genome?.genbank
           ? { ...fields.genome, bgcStart: bgcStart ?? undefined, bgcEnd: bgcEnd ?? undefined } : undefined,
+        pdb: fields.pdb?.length ? fields.pdb : undefined,
       };
       try {
         const existing: RiPPSubmission[] = JSON.parse(localStorage.getItem(SUBMISSIONS_KEY) ?? '[]');
@@ -1154,6 +1243,10 @@ function SubmitView({ startFromExisting = false, onBack }: { startFromExisting?:
       originStrain: f.origin?.strain ?? '',
       originSource: f.origin?.source || undefined,
       originGeography: f.origin?.geography ?? '',
+      originProduction: f.origin?.production || undefined,
+      originHost: f.origin?.host ?? '',
+      originEnzymes: f.origin?.enzymes ?? '',
+      pdb: (f.pdb ?? []).join(', '),
     });
     setStructureValue(f.smiles ?? '');
     setDois(f.dois?.length ? [...f.dois] : ['']);
@@ -1423,6 +1516,32 @@ function SubmitView({ startFromExisting = false, onBack }: { startFromExisting?:
             <Input placeholder="e.g. ITSIISLCTPGCKTGALMGCNMKTATCHCSIHVSK" style={{ fontFamily: 'monospace' }} />
           </Form.Item>
 
+          <Form.Item
+            label={<span>PDB ID(s) <span style={{ fontWeight: 400, color: '#6b7280', fontSize: 12 }}>(optional)</span></span>}
+            name="pdb"
+            extra={
+              pdbIds.length > 0 ? (
+                <span style={{ fontSize: 12 }}>
+                  {pdbIds.map((id, i) => (
+                    <span key={id}>{i > 0 && ', '}<a href={pdbUrl(id)} target="_blank" rel="noreferrer">{id} ↗</a></span>
+                  ))}
+                  <span style={{ color: '#6b7280' }}> : the record will link to {pdbIds.length > 1 ? 'these entries' : 'this entry'}.</span>
+                </span>
+              ) : (
+                <span style={{ fontSize: 12, color: '#6b7280' }}>
+                  A structure of this compound in the Protein Data Bank, for example an NMR solution structure. Separate several with commas.
+                </span>
+              )
+            }
+            rules={[{
+              validator: (_r, v?: string) => (splitPdb(v).every((id) => PDB_PATTERN.test(id))
+                ? Promise.resolve()
+                : Promise.reject(new Error('A PDB ID has four characters and starts with a digit, e.g. 7ZWJ.'))),
+            }]}
+          >
+            <Input placeholder="e.g. 7ZWJ" style={{ maxWidth: 420 }} />
+          </Form.Item>
+
           <Divider titlePlacement="start">
             <span style={{ color: '#2563eb', fontWeight: 600, fontSize: 14 }}>Part 2: Spectra</span>
           </Divider>
@@ -1569,9 +1688,13 @@ function SubmitView({ startFromExisting = false, onBack }: { startFromExisting?:
               label: <span style={{ fontWeight: 600 }}>Origin</span>,
               children: (
                 <div>
+                  <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
+                    The organism is the one the gene cluster comes from. If the compound was made somewhere
+                    else, in a heterologous host or in vitro, say so under How it was made.
+                  </p>
                   <Row gutter={16}>
                     <Col span={12}>
-                      <Form.Item label="Producing Organism" name="originOrganism">
+                      <Form.Item label="Organism (source of the gene cluster)" name="originOrganism">
                         <Input placeholder="e.g. Lactococcus lactis" />
                       </Form.Item>
                     </Col>
@@ -1583,7 +1706,28 @@ function SubmitView({ startFromExisting = false, onBack }: { startFromExisting?:
                   </Row>
                   <Row gutter={16}>
                     <Col span={12}>
-                      <Form.Item label="Isolation Source" name="originSource">
+                      <Form.Item label="How it was made" name="originProduction">
+                        <SelectWithOther options={PRODUCTION_METHODS} placeholder="Select" />
+                      </Form.Item>
+                    </Col>
+                    {hostNeeded(production) && (
+                      <Col span={12}>
+                        <Form.Item label="Expression host and strain" name="originHost">
+                          <Input placeholder="e.g. Escherichia coli BL21(DE3)" />
+                        </Form.Item>
+                      </Col>
+                    )}
+                    {enzymesNeeded(production) && (
+                      <Col span={12}>
+                        <Form.Item label="Enzymes used" name="originEnzymes">
+                          <Input placeholder="e.g. purified leader peptidase and lasso cyclase" />
+                        </Form.Item>
+                      </Col>
+                    )}
+                  </Row>
+                  <Row gutter={16}>
+                    <Col span={12}>
+                      <Form.Item label="Isolation Source of the organism" name="originSource">
                         <SelectWithOther options={ISOLATION_SOURCES} placeholder="Select source" showSearch />
                       </Form.Item>
                     </Col>

@@ -215,4 +215,5 @@ var commentSubtagList = []string{
 	"PRECURSOR_SEQ",
 	"MiBIG",
 	"GenBank",
+	"PDB",
 }

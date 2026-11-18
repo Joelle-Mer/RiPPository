@@ -2,6 +2,9 @@
 // them, the site's server checks them again before a pull request is opened, and a record already
 // in the database can be read back into the form to start a new submission from it.
 
+import { calculateSplash } from '../../../../utils/chemistry';
+import { looksLikeProfile, processingNote, toPeakList } from './centroid';
+
 export type Peak = { mz: number; intensity: number; rel: number };
 
 export type SpectrumSettings = {
@@ -15,7 +18,29 @@ export type SpectrumSettings = {
   precursorMz?: string;
 };
 
-export type RecordSpectrum = SpectrumSettings & { peaks: Peak[]; splash?: string };
+// processing: how the peak list was made, when it was not given as one (an MS$DATA_PROCESSING value)
+export type RecordSpectrum = SpectrumSettings & { peaks: Peak[]; splash?: string; processing?: string };
+
+// how the compound that was measured was made; the organism fields name where the gene cluster
+// comes from, which for heterologous expression or in vitro work is not where the compound was made
+export const PRODUCTION_METHODS = [
+  'Native producer',
+  'Heterologous expression',
+  'In vitro enzymatic modification',
+  'Heterologous expression and in vitro modification',
+  'Chemical synthesis',
+];
+
+// a PDB identifier: four characters, the first a digit (the extended 12-character form is not yet issued)
+export const PDB_PATTERN = /^[0-9][A-Za-z0-9]{3}$/;
+export const pdbUrl = (id: string) => `https://www.rcsb.org/structure/${id.toUpperCase()}`;
+// the PDB identifiers in a comment, as this site writes them ("PDB 7ZWJ") or as typed in a note
+export function pdbIdsIn(text: string): string[] {
+  const m = /^PDB(?:\s*ID)?s?\s*:?\s+(.+)$/i.exec(text.trim());
+  if (!m) return [];
+  const ids = m[1].split(/[\s,;]+/).filter(Boolean);
+  return ids.every((id) => PDB_PATTERN.test(id)) ? ids.map((id) => id.toUpperCase()) : [];
+}
 
 export type RecordFields = {
   orcid: string;
@@ -33,8 +58,12 @@ export type RecordFields = {
   note?: string;
   dbLinks?: Array<{ db: string; id: string }>;
   bioactivity?: Array<{ activity: string; target?: string; mic?: string; ic50?: string }>;
-  origin?: { organism?: string; strain?: string; source?: string; geography?: string };
+  origin?: {
+    organism?: string; strain?: string; source?: string; geography?: string;
+    production?: string; host?: string; enzymes?: string;
+  };
   genome?: { mibig?: string; genbank?: string };
+  pdb?: string[];
 };
 
 // a new record carries this until the server gives it its accession
@@ -167,11 +196,15 @@ function formatOne(fields: RecordFields, s: RecordSpectrum, title: string, acces
   lines.push('');
 
   const o = fields.origin ?? {};
-  if (o.organism || o.strain || o.source || o.geography) {
+  const labelled = (label: string, v: string | undefined) => { if (oneLine(v)) push('SP$SAMPLE', `${label}: ${v}`); };
+  if ([o.organism, o.strain, o.source, o.geography, o.production, o.host, o.enzymes].some((v) => oneLine(v))) {
     push('SP$SCIENTIFIC_NAME', o.organism);
     if (oneLine(o.strain)) push('SP$LINEAGE', `strain: ${o.strain}`);
     push('SP$SAMPLE', o.source);
-    if (oneLine(o.geography)) push('SP$SAMPLE', `Geographic origin: ${o.geography}`);
+    labelled('Geographic origin', o.geography);
+    labelled('Production', o.production);
+    labelled('Expression host', o.host);
+    labelled('Enzymes', o.enzymes);
     lines.push('');
   }
 
@@ -183,12 +216,14 @@ function formatOne(fields: RecordFields, s: RecordSpectrum, title: string, acces
   if (oneLine(s.ionization)) push('AC$MASS_SPECTROMETRY', `IONIZATION ${s.ionization}`);
   if (oneLine(s.precursorMz)) push('MS$FOCUSED_ION', `PRECURSOR_M/Z ${s.precursorMz}`);
   if (oneLine(s.precursorType)) push('MS$FOCUSED_ION', `PRECURSOR_TYPE ${s.precursorType}`);
+  push('MS$DATA_PROCESSING', s.processing);
   lines.push('');
 
   for (const doi of fields.dois) push('COMMENT', `Publication DOI: ${doi}`);
   if (oneLine(fields.precursorSeq)) push('COMMENT', `PRECURSOR_SEQ ${fields.precursorSeq}`);
   if (oneLine(fields.genome?.mibig)) push('COMMENT', `MiBIG ${fields.genome?.mibig}`);
   if (oneLine(fields.genome?.genbank)) push('COMMENT', `GenBank ${fields.genome?.genbank}`);
+  for (const id of fields.pdb ?? []) if (PDB_PATTERN.test(oneLine(id))) push('COMMENT', `PDB ${oneLine(id).toUpperCase()}`);
   for (const b of fields.bioactivity ?? []) {
     const parts = [b.activity, b.target && `target: ${b.target}`, b.mic && `MIC: ${b.mic}`,
       b.ic50 && `IC50: ${b.ic50}`].map(oneLine).filter(Boolean);
@@ -220,6 +255,7 @@ export function checkRecord(text: string): string | null {
   const seen = new Map<string, number>();
   let last = '';
   let peaks = 0;
+  const points: Array<{ mz: number; intensity: number }> = [];
   for (let n = 0; n < lines.length - 1; n++) {
     const line = lines[n];
     const at = `Line ${n + 1}`;
@@ -231,6 +267,8 @@ export function checkRecord(text: string): string | null {
         if (v.length !== 3 || !NUMBER.test(v[0]) || !NUMBER.test(v[1]) || !/^\d+$/.test(v[2])) {
           return `${at}: a peak must be "m/z intensity relative-intensity".`;
         }
+        if (!(Number(v[1]) > 0)) return `${at}: a peak must have an intensity above zero.`;
+        points.push({ mz: Number(v[0]), intensity: Number(v[1]) });
         peaks++;
         continue;
       }
@@ -256,7 +294,45 @@ export function checkRecord(text: string): string | null {
   const counted = Number(lines[seen.get('PK$NUM_PEAK')!].split(':')[1]);
   if (counted !== peaks) return `PK$NUM_PEAK says ${counted} but the record has ${peaks} peaks.`;
   if (peaks === 0) return 'The record has no peaks.';
+  if (looksLikeProfile(points)) {
+    return 'The peaks look like profile data (each peak given as a run of points); a record holds one m/z per peak.';
+  }
   return null;
+}
+
+// A record whose peaks are profile data, or include zero-intensity rows, with its peak block rebuilt
+// as a peak list; any other record comes back unchanged. The server applies this to every record it
+// receives, so profile data sent past the Submit page (an old copy of the page, a script) is
+// converted the same way rather than turned away.
+export async function centroidRecord(text: string): Promise<string> {
+  const lines = text.replace(/\r\n/g, '\n').split('\n');
+  const at = lines.findIndex((l) => l.startsWith('PK$PEAK:'));
+  if (at < 0) return text;
+  let end = at + 1;
+  while (end < lines.length && lines[end].startsWith('  ')) end++;
+  const rows = lines.slice(at + 1, end).map((l) => l.trim().split(' '));
+  // a malformed peak line is left for checkRecord to name
+  if (rows.length === 0 || rows.some((r) => r.length !== 3 || !NUMBER.test(r[0]) || !NUMBER.test(r[1]))) return text;
+  const points = rows.map(([mz, intensity]) => ({ mz: Number(mz), intensity: Number(intensity) }));
+  const made = toPeakList(points);
+  if ((!made.converted && made.peaks.length === points.length) || made.peaks.length === 0) return text;
+  const max = Math.max(...made.peaks.map((p) => p.intensity));
+  const splash = await calculateSplash(made.peaks).catch(() => '');
+  const head = lines.slice(0, at)
+    .filter((l) => !(made.converted && l.startsWith('MS$DATA_PROCESSING: FIND_PEAK')))
+    .map((l) => {
+      if (l.startsWith('PK$NUM_PEAK:')) return `PK$NUM_PEAK: ${made.peaks.length}`;
+      if (l.startsWith('PK$SPLASH:') && splash) return `PK$SPLASH: ${splash}`;
+      return l;
+    });
+  if (made.converted) {
+    let last = -1;
+    head.forEach((l, i) => { if (/^(AC|MS)\$/.test(l)) last = i; });
+    head.splice(last + 1, 0, `MS$DATA_PROCESSING: ${processingNote(made.converted)}`);
+  }
+  const peakLines = made.peaks.map((p) =>
+    `  ${p.mz.toFixed(4)} ${p.intensity.toFixed(4)} ${Math.round((p.intensity / max) * 999)}`);
+  return [...head, lines[at], ...peakLines, ...lines.slice(end)].join('\n');
 }
 
 export type ReadRecord = {
@@ -308,10 +384,16 @@ export function readRecord(text: string): ReadRecord {
       case 'SP$LINEAGE':
         if (/^strain:/i.test(value)) origin.strain = value.replace(/^strain:\s*/i, '');
         break;
-      case 'SP$SAMPLE':
-        if (/^Geographic origin:/i.test(value)) origin.geography = value.replace(/^Geographic origin:\s*/i, '');
+      case 'SP$SAMPLE': {
+        const labelled = /^(Geographic origin|Production|Expression host|Enzymes):\s*(.*)$/i.exec(value);
+        const label = labelled?.[1].toLowerCase();
+        if (label === 'geographic origin') origin.geography = labelled![2];
+        else if (label === 'production') origin.production = labelled![2];
+        else if (label === 'expression host') origin.host = labelled![2];
+        else if (label === 'enzymes') origin.enzymes = labelled![2];
         else origin.source = value;
         break;
+      }
       case 'AC$INSTRUMENT': spectrum.instrument = value; break;
       case 'AC$INSTRUMENT_TYPE': spectrum.instrumentType = value; break;
       case 'AC$MASS_SPECTROMETRY':
@@ -328,6 +410,7 @@ export function readRecord(text: string): ReadRecord {
         else if (key === 'PRECURSOR_SEQ') fields.precursorSeq = after;
         else if (key === 'MiBIG') genome.mibig = after;
         else if (key === 'GenBank') genome.genbank = after;
+        else if (pdbIdsIn(value).length) (fields.pdb ??= []).push(...pdbIdsIn(value));
         else if (key === 'BIOACTIVITY') {
           const [activity, ...more] = after.split(';').map((p) => p.trim());
           const b: NonNullable<RecordFields['bioactivity']>[number] = { activity };

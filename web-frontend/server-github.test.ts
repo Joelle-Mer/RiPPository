@@ -3,13 +3,14 @@ import {
   checkSubmission,
   githubConfig,
   openSubmissionPr,
+  prepareSubmission,
   prStatus,
   rateLimiter,
   readConfig,
   recordReader,
   takenNumbers,
 } from './server-github';
-import { formatRecords } from './src/elements/routes/pages/submit/massbankRecord';
+import { checkRecord, formatRecords } from './src/elements/routes/pages/submit/massbankRecord';
 
 const cfg = { token: 'SECRET-KEY', owner: 'own', repo: 'data', base: 'main' };
 
@@ -277,5 +278,40 @@ describe('GitHub submissions on the server', () => {
     expect([allowed('a', 0), allowed('a', 10), allowed('a', 20)]).toEqual([true, true, false]);
     expect(allowed('b', 20)).toBe(true);
     expect(allowed('a', 1015)).toBe(true);
+  });
+});
+
+describe('profile data sent to the server', () => {
+  // two peaks, each sampled as an Orbitrap profile: seven points 0.004 Da apart, zeros between
+  const profilePeaks = [303.05, 449.108].flatMap((centre) =>
+    [-4, -3, -2, -1, 0, 1, 2, 3, 4].map((k) => {
+      const mz = centre + k * 0.004;
+      const y = Math.abs(k) === 4 ? 0 : 1000 * Math.exp(-((k * 0.004) ** 2) / (2 * 0.004 ** 2));
+      return { mz, intensity: y, rel: Math.round(y) };
+    }),
+  );
+  const profileRecord = formatRecords(fields, [{ ...spectrum('Thermo Orbitrap Exploris 120', '30 NCE'), peaks: profilePeaks }])[0];
+
+  it('would be refused as it is, which is what the conversion is for', () => {
+    expect(checkRecord(profileRecord)).not.toBeNull();
+    expect(checkSubmission({ ...good, records: [profileRecord] })).toMatch(/intensity above zero|profile/);
+  });
+
+  it('is converted to peaks and accepted, saying so in the record', async () => {
+    const sub = await prepareSubmission({ ...good, records: [profileRecord] });
+    expect(typeof sub).toBe('object');
+    const rec = (sub as { records: string[] }).records[0];
+    expect(checkRecord(rec)).toBeNull();
+    expect(rec).toContain('PK$NUM_PEAK: 2\n');
+    expect(rec).toMatch(/\n {2}303\.0500 1000\.0000 999\n {2}449\.1080 1000\.0000 999\n\/\//);
+    expect(rec).toContain('MS$DATA_PROCESSING: FIND_PEAK centroided from profile data on submission to RiPPository (18 points, 2 peaks)');
+    // every line above the peaks is kept, apart from the count, the SPLASH and the added line
+    const above = (r: string) => r.split('\n').filter((l) => !l.startsWith('  ') && !/^(PK\$NUM_PEAK|PK\$SPLASH|MS\$DATA_PROCESSING)/.test(l));
+    expect(above(rec)).toEqual(above(profileRecord));
+  });
+
+  it('leaves a peak list exactly as it came', async () => {
+    const sub = await prepareSubmission({ ...good, records });
+    expect((sub as { records: string[] }).records).toEqual(records);
   });
 });

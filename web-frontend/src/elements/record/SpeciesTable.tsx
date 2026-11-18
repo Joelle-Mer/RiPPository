@@ -59,6 +59,16 @@ function SpeciesTable({ species, width, height }: InputProps) {
           <NotAvailableLabel />
         ),
       },
+      // each sample line as its own row: "Label: value" lines under their label, the rest as the
+      // isolation source
+      ...(species?.sample ?? []).map((line, i) => {
+        const labelled = /^(Geographic origin|Production|Expression host|Enzymes):\s*(.+)$/i.exec(line);
+        return {
+          key: `sample-${i}`,
+          parameter: labelled ? labelled[1].charAt(0).toUpperCase() + labelled[1].slice(1) : 'Source',
+          value: labelled ? labelled[2] : line,
+        };
+      }),
     ];
 
     return (

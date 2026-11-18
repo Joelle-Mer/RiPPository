@@ -14,7 +14,7 @@ import {
 } from './server-utils.js';
 import RequestResponse from './src/types/RequestResponse.js';
 import {
-  checkSubmission,
+  prepareSubmission,
   githubConfig,
   openSubmissionPr,
   prStatus,
@@ -302,7 +302,8 @@ console.log(
 const submissionsAllowed = rateLimiter(10, 60 * 60 * 1000);
 baseRouter.post(
   '/submit-api/submission',
-  express.json({ limit: '2mb' }),
+  // room for profile data sent past the Submit page, which the server converts
+  express.json({ limit: '10mb' }),
   async (req: Request, res: Response) => {
     if (!github) {
       res
@@ -312,7 +313,7 @@ baseRouter.post(
         });
       return;
     }
-    const sub = checkSubmission(req.body);
+    const sub = await prepareSubmission(req.body);
     if (typeof sub === 'string') {
       res.status(400).json({ error: sub });
       return;
