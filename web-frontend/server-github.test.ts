@@ -5,12 +5,15 @@ import {
   openSubmissionPr,
   prepareSubmission,
   prStatus,
+  rdkitInchi,
   rateLimiter,
   readConfig,
   recordReader,
   takenNumbers,
 } from './server-github';
-import { checkRecord, formatRecords } from './src/elements/routes/pages/submit/massbankRecord';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { checkRecord, formatRecords, withInchi } from './src/elements/routes/pages/submit/massbankRecord';
 
 const cfg = { token: 'SECRET-KEY', owner: 'own', repo: 'data', base: 'main' };
 
@@ -333,5 +336,52 @@ describe('the SPLASH of a submitted record', () => {
     expect(none).not.toContain('PK$SPLASH');
     const rec = ((await prepareSubmission({ ...good, records: [none] })) as { records: string[] }).records[0];
     expect(rec).toContain(`\nPK$SPLASH: ${REFERENCE}\nPK$NUM_PEAK: 2\n`);
+  });
+});
+
+describe('the InChI of a submitted record', () => {
+  // acetamide, as Python RDKit 2026.03 writes it
+  const INCHI = 'InChI=1S/C2H5NO/c1-2(3)4/h1H3,(H2,3,4)';
+  const KEY = 'DLFVBJFMPXGRIB-UHFFFAOYSA-N';
+  const withSmiles = formatRecords({ ...fields, smiles: 'CC(=O)N' }, [spectrum('Bruker maXis Impact', '20 eV')])[0];
+  const first = async (body: unknown, ...more: [] | [Parameters<typeof prepareSubmission>[1]]) =>
+    ((await prepareSubmission(body, ...more)) as { records: string[] }).records[0];
+
+  it('is made from the SMILES by the server when the record has none, with its InChIKey', async () => {
+    expect(withSmiles).not.toContain('CH$IUPAC');
+    const rec = await first({ ...good, records: [withSmiles] });
+    expect(rec).toContain(`\nCH$SMILES: CC(=O)N\nCH$IUPAC: ${INCHI}\nCH$LINK: INCHIKEY ${KEY}\n`);
+    expect(checkRecord(rec)).toBeNull();
+  });
+
+  it('is missing when nothing can make it, as it was before (the control)', async () => {
+    const nothing = async () => ({ inchiOf: () => null, keyOf: () => null });
+    const rec = await first({ ...good, records: [withSmiles] }, nothing);
+    expect(rec).not.toContain('CH$IUPAC');
+    expect(rec).not.toContain('INCHIKEY');
+  });
+
+  it('does not stop a submission when RDKit cannot be loaded', async () => {
+    const broken = () => Promise.reject(new Error('no wasm'));
+    const sub = await prepareSubmission({ ...good, records: [withSmiles] }, broken);
+    expect(typeof sub).toBe('object');
+    expect((sub as { records: string[] }).records[0]).not.toContain('CH$IUPAC');
+  });
+
+  it('keeps an InChI the record carries and adds only its key', async () => {
+    const given = formatRecords({ ...fields, smiles: 'CC(=O)N', inchi: INCHI }, [spectrum('Bruker maXis Impact', '20 eV')])[0];
+    const rec = await first({ ...good, records: [given] });
+    expect(rec.split('\n').filter((l) => l.startsWith('CH$IUPAC:'))).toEqual([`CH$IUPAC: ${INCHI}`]);
+    expect(rec).toContain(`\nCH$LINK: INCHIKEY ${KEY}\n`);
+  });
+
+  const real = join(__dirname, '../../RiPPository-data/RiPP-data/RIPPOS-0001.txt');
+  it.skipIf(!existsSync(real))('gives back the stored InChI of a real record from its SMILES', async () => {
+    const file = real;
+    const stored = readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
+    const inchi = stored.split('\n').find((l) => l.startsWith('CH$IUPAC: '))!;
+    const make = await rdkitInchi();
+    const remade = withInchi(stored.split('\n').filter((l) => l !== inchi).join('\n'), make);
+    expect(remade.split('\n').find((l) => l.startsWith('CH$IUPAC: '))).toBe(inchi);
   });
 });

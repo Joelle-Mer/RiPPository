@@ -13,6 +13,7 @@ import downloadRawRecord from '../../utils/request/downloadRawMassBankRecord';
 import DownloadFormat from '../../types/DownloadFormat';
 import downloadRecords from '../../utils/request/downloadRecords';
 import ExportableContent from '../common/ExportableContent';
+import publicationDois from '../../utils/publicationDois';
 
 // ── DOI → publication title + authors via CrossRef ────────────────────────────
 type DoiMeta = { title: string; authors: string } | null;
@@ -29,12 +30,15 @@ function useDoiMeta(doi: string): { loading: boolean; meta: DoiMeta } {
       try {
         const res = await fetch(
           'https://api.crossref.org/works/' + encodeURIComponent(trimmed),
-          { headers: { 'User-Agent': 'RiPPository/1.0' } },
+          // a slow CrossRef leaves the plain link after 8 s rather than a placeholder for good
+          { headers: { 'User-Agent': 'RiPPository/1.0' }, signal: AbortSignal.timeout(8000) },
         );
         if (!res.ok || cancelled) { setLoading(false); return; }
         const json = await res.json();
         const msg = json?.message;
-        const title: string = msg?.title?.[0] ?? '';
+        // CrossRef titles can carry markup (<i>Microcystis</i>, &amp;); only its text is shown
+        const title: string =
+          new DOMParser().parseFromString(msg?.title?.[0] ?? '', 'text/html').body.textContent?.trim() ?? '';
         const authors: string = (msg?.author ?? [])
           .map((a: { given?: string; family?: string }) => [a.given, a.family].filter(Boolean).join(' '))
           .join(', ');
@@ -50,14 +54,16 @@ function useDoiMeta(doi: string): { loading: boolean; meta: DoiMeta } {
 function PublicationRow({ doi }: { doi: string }) {
   const { loading, meta } = useDoiMeta(doi);
   if (loading) return <Skeleton active paragraph={{ rows: 1 }} title={false} style={{ maxWidth: 500 }} />;
+  const link = `https://doi.org/${doi}`;
+  // without a title from CrossRef the article is still a link
   if (!meta) return (
-    <Tooltip title={doi}>
-      <span style={{ color: '#9ca3af', fontSize: 12 }}>{doi || 'N/A'}</span>
+    <Tooltip title="Open the article">
+      <a href={link} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>{doi}</a>
     </Tooltip>
   );
   return (
     <div>
-      <div style={{ fontWeight: 500 }}>{meta.title}</div>
+      <a href={link} target="_blank" rel="noreferrer" style={{ fontWeight: 500, color: 'inherit' }}>{meta.title}</a>
       {meta.authors && <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{meta.authors}</div>}
       <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>
         <a href={`https://doi.org/${doi}`} target="_blank" rel="noreferrer">{doi}</a>
@@ -135,10 +141,8 @@ function RecordViewHeader({ record, width, imageWidth = 260 }: InputProps) {
     });
     compoundClasses.sort((a, b) => a.localeCompare(b));
 
-    // Publication DOIs
-    const dois = record.publication
-      ? record.publication.split(/[,;]+/).map((d) => d.trim()).filter(Boolean)
-      : [];
+    // the articles the record cites, from PUBLICATION and from its "Publication DOI:" comments
+    const dois = publicationDois(record.publication, record.comments);
 
     // Formula display
     let formulaComponent: JSX.Element = <MF mf={record.compound.formula} />;
@@ -288,7 +292,7 @@ function RecordViewHeader({ record, width, imageWidth = 260 }: InputProps) {
             </InfoRow>
 
             {dois.length > 0 && dois.map((doi, i) => (
-              <InfoRow key={`pub-${i}`} label={i === 0 ? 'Publication' : ''}>
+              <InfoRow key={`pub-${i}`} label={i === 0 ? (dois.length > 1 ? 'Publications' : 'Publication') : ''}>
                 <PublicationRow doi={doi} />
               </InfoRow>
             ))}
@@ -357,6 +361,7 @@ function RecordViewHeader({ record, width, imageWidth = 260 }: InputProps) {
     record.authors,
     record.compound,
     record.peak.splash,
+    record.comments,
     record.publication,
     record.title,
     width,

@@ -356,6 +356,51 @@ export async function withSplash(text: string): Promise<string> {
   return lines.join('\n');
 }
 
+// how structure identifiers are made; on the server this is RDKit, in tests a stand-in
+export type InchiMaker = {
+  inchiOf(smiles: string): string | null;
+  keyOf(inchi: string): string | null;
+};
+const INCHIKEY = /^[A-Z]{14}-[A-Z]{10}-[A-Z]$/;
+// the order MassBank lists CH$LINK databases in (pkg/massbank/mb_term_lists.go)
+const LINK_ORDER = [
+  'CAS', 'CAYMAN', 'CHEBI', 'CHEMBL', 'CHEMPDB', 'CHEMSPIDER', 'COMPTOX', 'HMDB', 'INCHIKEY',
+  'KAPPAVIEW', 'KEGG', 'KNAPSACK', 'LIPIDBANK', 'LIPIDMAPS', 'NIKKAJI', 'PUBCHEM', 'ZINC',
+];
+
+// A record with the InChI made from its SMILES when it carries none, and the InChIKey of its InChI
+// as a CH$LINK when it carries none: the site counts compounds by InChI and finds them by InChIKey,
+// and the Submit page could only fetch them from PubChem, which knows few RiPPs. An InChI or key the
+// record already carries is kept. A SMILES that does not parse leaves the record as it is.
+export function withInchi(text: string, make: InchiMaker): string {
+  const lines = text.replace(/\r\n/g, '\n').split('\n');
+  const valueOf = (tag: string) => lines.find((l) => l.startsWith(`${tag}: `))?.slice(tag.length + 2).trim();
+  const smiles = valueOf('CH$SMILES');
+  let inchi = valueOf('CH$IUPAC');
+  if (inchi === 'N/A') inchi = undefined;
+  if (!inchi) {
+    if (!smiles || smiles === 'N/A') return text;
+    const made = make.inchiOf(smiles);
+    if (!made || !made.startsWith('InChI=')) return text;
+    inchi = made;
+    const old = lines.findIndex((l) => l.startsWith('CH$IUPAC:'));
+    if (old >= 0) lines[old] = `CH$IUPAC: ${inchi}`;
+    else lines.splice(lines.findIndex((l) => l.startsWith('CH$SMILES:')) + 1, 0, `CH$IUPAC: ${inchi}`);
+  }
+  if (!lines.some((l) => l.startsWith('CH$LINK: INCHIKEY '))) {
+    const key = make.keyOf(inchi);
+    if (key && INCHIKEY.test(key)) {
+      const rank = (l: string) => LINK_ORDER.indexOf(l.slice('CH$LINK: '.length).split(' ')[0]);
+      const after = lines.findIndex(
+        (l) => l.startsWith('CH$LINK: ') && rank(l) > LINK_ORDER.indexOf('INCHIKEY'),
+      );
+      const lastCh = lines.reduce((at, l, i) => (l.startsWith('CH$') ? i : at), -1);
+      lines.splice(after >= 0 ? after : lastCh + 1, 0, `CH$LINK: INCHIKEY ${key}`);
+    }
+  }
+  return lines.join('\n');
+}
+
 export type ReadRecord = {
   accession: string;
   title: string;

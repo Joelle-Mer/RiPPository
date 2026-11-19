@@ -2,8 +2,10 @@
 // browser. The key is read at run time from GITHUB_TOKEN; it is never built into the client code.
 import {
   NEW_ACCESSION,
+  type InchiMaker,
   centroidRecord,
   checkRecord,
+  withInchi,
   withSplash,
 } from './src/elements/routes/pages/submit/massbankRecord.js';
 
@@ -123,16 +125,45 @@ export function checkSubmission(body: unknown): Submission | string {
   };
 }
 
+// RDKit, loaded once, on the first submission; the browser never loads it
+let rdkit: Promise<InchiMaker> | null = null;
+export function rdkitInchi(): Promise<InchiMaker> {
+  rdkit ??= import('@rdkit/rdkit').then(async ({ default: load }) => {
+    const RDKit = await load();
+    return {
+      inchiOf(smiles: string) {
+        const mol = RDKit.get_mol(smiles);
+        if (!mol) return null;
+        try {
+          return mol.is_valid() ? mol.get_inchi() : null;
+        } finally {
+          mol.delete();
+        }
+      },
+      keyOf: (inchi: string) => RDKit.get_inchikey_for_inchi(inchi) || null,
+    };
+  });
+  return rdkit;
+}
+
 // what the server does with a submission: profile data is converted to peaks first, as the Submit
 // page does, so a spectrum is never turned away for being profile data; the SPLASH is computed here
-// from the peaks, whatever the record carried; then everything is checked
-export async function prepareSubmission(body: unknown): Promise<Submission | string> {
+// from the peaks, whatever the record carried; a missing InChI and InChIKey are made from the
+// SMILES; then everything is checked
+export async function prepareSubmission(
+  body: unknown,
+  inchi: () => Promise<InchiMaker> = rdkitInchi,
+): Promise<Submission | string> {
   if (typeof body === 'object' && body !== null) {
     const b = body as Record<string, unknown>;
     if (Array.isArray(b.records) && b.records.length <= MAX_SPECTRA) {
+      // without RDKit the records go on as they came, never turned away for it
+      const make = await inchi().catch(() => ({ inchiOf: () => null, keyOf: () => null }));
       b.records = await Promise.all(
         b.records.map((r) =>
-          typeof r === 'string' && r.length <= MAX_RECORD ? centroidRecord(r).then(withSplash) : r,
+          typeof r === 'string' && r.length <= MAX_RECORD
+            ? centroidRecord(r).then(withSplash).then((t) => withInchi(t, make))
+            : r,
         ),
       );
     }

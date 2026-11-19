@@ -11,6 +11,7 @@ import {
   readRecord,
   type RecordFields,
   type RecordSpectrum,
+  withInchi,
 } from './massbankRecord';
 
 // the repository root, and the data repository checked out beside it
@@ -210,5 +211,37 @@ describe('records the database loader reads', () => {
     expect(expectedPrecursorMz(1000, '[M+Na]+')).toBeCloseTo(1022.989218, 5);
     expect(expectedPrecursorMz(null, '[M+H]+')).toBeNull();
     expect(expectedPrecursorMz(1000, 'something else')).toBeNull();
+  });
+});
+
+describe('a missing InChI and InChIKey, filled in from the SMILES', () => {
+  // a stand-in for RDKit: one known molecule, and the key of its InChI
+  const make = {
+    inchiOf: (smiles: string) => (smiles === 'CC(=O)N' ? 'InChI=1S/C2H5NO/c1-2(3)4/h1H3,(H2,3,4)' : null),
+    keyOf: (inchi: string) => (inchi.startsWith('InChI=1S/C2H5NO/') ? 'DLFVBJFMPXGRIB-UHFFFAOYSA-N' : null),
+  };
+  const record = (chem: string[]) =>
+    ['ACCESSION: NEW', 'CH$NAME: Acetamide', 'CH$FORMULA: C2H5NO', ...chem, '', 'AC$INSTRUMENT: x'].join('\n');
+
+  it('puts the key among the other links in the order MassBank lists them', () => {
+    const out = withInchi(record(['CH$SMILES: CC(=O)N', 'CH$LINK: CAS 60-35-5', 'CH$LINK: PUBCHEM CID:178']), make);
+    expect(out.split('\n').filter((l) => l.startsWith('CH$'))).toEqual([
+      'CH$NAME: Acetamide', 'CH$FORMULA: C2H5NO', 'CH$SMILES: CC(=O)N',
+      'CH$IUPAC: InChI=1S/C2H5NO/c1-2(3)4/h1H3,(H2,3,4)',
+      'CH$LINK: CAS 60-35-5', 'CH$LINK: INCHIKEY DLFVBJFMPXGRIB-UHFFFAOYSA-N', 'CH$LINK: PUBCHEM CID:178',
+    ]);
+  });
+
+  it('replaces an InChI given as N/A, and leaves a record whose SMILES cannot be read as it is', () => {
+    expect(withInchi(record(['CH$SMILES: CC(=O)N', 'CH$IUPAC: N/A']), make)).toContain(
+      '\nCH$IUPAC: InChI=1S/C2H5NO/c1-2(3)4/h1H3,(H2,3,4)\nCH$LINK: INCHIKEY DLFVBJFMPXGRIB-UHFFFAOYSA-N\n',
+    );
+    const unreadable = record(['CH$SMILES: not a molecule']);
+    expect(withInchi(unreadable, make)).toBe(unreadable);
+  });
+
+  it('keeps a key the record already carries', () => {
+    const keyed = record(['CH$SMILES: CC(=O)N', 'CH$LINK: INCHIKEY SOMEONEELSESKEY-UHFFFAOYSA-N']);
+    expect(withInchi(keyed, make).match(/INCHIKEY/g)).toHaveLength(1);
   });
 });
