@@ -114,7 +114,7 @@ def test_a_bad_tolerance_is_refused_with_a_reason():
     assert r.status_code == 422 and "greater than 0" in r.json()["detail"]
 
 
-RECORD = {"accession": "RIPPOS-LU-0006",
+RECORD = {"accession": "RIPPOS-0006",
           "compound": {"names": ["Planosporicin"], "classes": ["Natural Product; RiPP; Lanthipeptide"],
                        "formula": "C2H6O", "smiles": "CCO", "mass": 46.04186},
           "mass_spectrometry": {"focused_ion": [{"subtag": "PRECURSOR_TYPE", "value": "[M+2H]2+"}]},
@@ -123,12 +123,12 @@ RECORD = {"accession": "RIPPOS-LU-0006",
 
 def test_an_example_takes_the_same_path_as_an_upload(monkeypatch):
     monkeypatch.setattr(service, "from_rippository", lambda path: RECORD)
-    found = client.post("/examples/RIPPOS-LU-0006").json()["spectra"]
+    found = client.post("/examples/RIPPOS-0006").json()["spectra"]
     assert len(found) == 1
     assert found[0]["name"] == "Planosporicin" and found[0]["charge_hint"] == "2+"
     assert [p[0] for p in found[0]["peaks"]] == [100.25, 200.5]
     # the structure comes cut into residues from the data file, not from the record
-    assert found[0]["known"] == service.core.known_structure("RIPPOS-LU-0006")
+    assert found[0]["known"] == service.core.known_structure("RIPPOS-0006")
     expected = service.core.precursor_from_mass(46.04186, "[M+2H]2+", "C2H6O")
     assert found[0]["precursor"] == expected["precursor_mz"]
     assert found[0]["precursor_source"]["derived"]["formula_check"]["verdict"] == "monoisotopic"
@@ -137,7 +137,7 @@ def test_an_example_takes_the_same_path_as_an_upload(monkeypatch):
 def test_an_average_mass_is_refused_and_the_example_still_loads(monkeypatch):
     record = {**RECORD, "compound": {**RECORD["compound"], "mass": 46.069}}
     monkeypatch.setattr(service, "from_rippository", lambda path: record)
-    found = client.post("/examples/RIPPOS-LU-0006").json()["spectra"]
+    found = client.post("/examples/RIPPOS-0006").json()["spectra"]
     assert found[0]["precursor"] is None
     assert "average mass" in found[0]["precursor_source"]["problem"]
 
@@ -159,7 +159,7 @@ def test_only_an_accession_reaches_the_database(monkeypatch, bad):
 
 def test_an_unreachable_database_is_explained(monkeypatch):
     monkeypatch.setattr(service, "RIPPOSITORY_API", "http://127.0.0.1:9")
-    r = client.post("/examples/RIPPOS-LU-0001")
+    r = client.post("/examples/RIPPOS-0001")
     assert r.status_code == 502 and "could not be reached" in r.json()["detail"]
 
 
@@ -294,8 +294,8 @@ def test_an_upload_carries_no_structure():
 
 
 def test_a_step_inside_a_fused_unit_is_found_by_mass():
-    # RIPPOS-LU-0001 starts with Leu/Ile-Thn, Leu/Ile and Cys fused with the loss of a water
-    known = service.core.known_structure("RIPPOS-LU-0001")
+    # RIPPOS-0001 starts with Leu/Ile-Thn, Leu/Ile and Cys fused with the loss of a water
+    known = service.core.known_structure("RIPPOS-0001")
     assert known["unit_labels"][0] == "Leu/Ile-Thn"
     steps = [{"label": "Cys", "mass": _a["Cys"]}, {"label": "Trp", "mass": _a["Trp"]}]
     r = client.post("/compare-known", json={"steps": steps, "known": known}).json()

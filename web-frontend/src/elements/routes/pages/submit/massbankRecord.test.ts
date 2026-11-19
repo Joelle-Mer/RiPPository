@@ -148,11 +148,11 @@ describe('records the database loader reads', () => {
     });
   });
 
-  it.skipIf(!existsSync(join(DATA, 'RIPPOS-LU-0001.txt')))('reads a record already in RiPPository', () => {
-    const file = join(DATA, 'RIPPOS-LU-0001.txt');
+  it.skipIf(!existsSync(join(DATA, 'RIPPOS-0001.txt')))('reads a record already in RiPPository', () => {
+    const file = join(DATA, 'RIPPOS-0001.txt');
     const text = readFileSync(file, 'utf-8');
     const r = readRecord(text);
-    expect(r.accession).toBe('RIPPOS-LU-0001');
+    expect(r.accession).toBe('RIPPOS-0001');
     expect(r.fields.compoundName).toBe('Aerucyclamide A');
     expect([r.fields.compoundClass, r.fields.compoundSubClass]).toEqual(['Cyanobactin', 'Macrocyclic']);
     expect(r.fields.dois).toEqual(['10.1021/np800118g']);

@@ -28,8 +28,10 @@ export type Submission = {
 
 type Fetch = typeof fetch;
 
-export const ACCESSION_PREFIX = 'RIPPOS-LU-';
-const ACCESSION = /^RIPPOS-LU-\d{4,6}$/;
+// RIPPOS-0001; records before 2026-11-19 were named RIPPOS-LU-0001, and those names are still read
+// so their numbers are never given out again
+export const ACCESSION_PREFIX = 'RIPPOS-';
+const ACCESSION = /^RIPPOS-(?:LU-)?\d{4,6}$/;
 const ORCID = /^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/;
 const MAX_RECORD = 1_000_000;
 const MAX_SPECTRA = 20;
@@ -157,16 +159,16 @@ export const accessionFor = (n: number) =>
   ACCESSION_PREFIX + String(n).padStart(4, '0');
 
 // every number already taken: records on the main branch, and the range each submission branch
-// holds (submission/rippos-lu-0010 or submission/rippos-lu-0010-0012); older branches end in a
-// 14-digit time, which is not a number
+// holds (submission/rippos-0010 or submission/rippos-0010-0012, earlier submission/rippos-lu-0010);
+// older branches end in a 14-digit time, which is not a number
 export function takenNumbers(files: string[], branches: string[]): number[] {
   const taken: number[] = [];
   for (const f of files) {
-    const m = /^RIPPOS-LU-(\d+)\.txt$/i.exec(f);
+    const m = /^RIPPOS-(?:LU-)?(\d+)\.txt$/i.exec(f);
     if (m) taken.push(Number(m[1]));
   }
   for (const b of branches) {
-    const m = /submission\/rippos-lu-(\d+)(?:-(\d+))?$/i.exec(b);
+    const m = /submission\/rippos-(?:lu-)?(\d+)(?:-(\d+))?$/i.exec(b);
     if (!m) continue;
     const first = Number(m[1]);
     const last = m[2] && m[2].length < 8 ? Number(m[2]) : first;

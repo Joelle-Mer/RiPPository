@@ -1,5 +1,5 @@
 {
- "RIPPOS-LU-0001": {
+ "RIPPOS-0001": {
   "class": "Cyanobactin",
   "formula": "C24H34N6O4S2",
   "inchikey": null,
@@ -24,7 +24,7 @@
   ],
   "units_are_residues": true
  },
- "RIPPOS-LU-0002": {
+ "RIPPOS-0002": {
   "class": "Cyanobactin",
   "formula": "C24H32N6O4S2",
   "inchikey": null,
@@ -49,7 +49,7 @@
   ],
   "units_are_residues": true
  },
- "RIPPOS-LU-0003": {
+ "RIPPOS-0003": {
   "class": "Cyanobactin",
   "formula": "C24H32N6O5S",
   "inchikey": null,
@@ -74,7 +74,7 @@
   ],
   "units_are_residues": true
  },
- "RIPPOS-LU-0004": {
+ "RIPPOS-0004": {
   "class": "Biarylitide",
   "formula": "C26H27N5O6",
   "inchikey": null,
@@ -97,7 +97,7 @@
   ],
   "units_are_residues": null
  },
- "RIPPOS-LU-0005": {
+ "RIPPOS-0005": {
   "class": "Biarylitide",
   "formula": "C26H27N5O7",
   "inchikey": null,
@@ -120,7 +120,7 @@
   ],
   "units_are_residues": null
  },
- "RIPPOS-LU-0006": {
+ "RIPPOS-0006": {
   "class": "Lanthipeptide",
   "formula": "C90H125N27O28S5",
   "inchikey": null,
@@ -193,7 +193,7 @@
   ],
   "units_are_residues": null
  },
- "RIPPOS-LU-0008": {
+ "RIPPOS-0008": {
   "class": "Thiopeptide",
   "formula": "C71H81N19O18S5",
   "inchikey": null,
@@ -236,7 +236,7 @@
   ],
   "units_are_residues": null
  },
- "RIPPOS-LU-0009": {
+ "RIPPOS-0009": {
   "class": "Thiopeptide",
   "formula": "C71H81N19O18S5",
   "inchikey": null,

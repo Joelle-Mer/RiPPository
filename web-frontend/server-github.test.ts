@@ -131,7 +131,7 @@ describe('GitHub submissions on the server', () => {
   });
 
   it('lets no record choose its own accession', () => {
-    const chosen = records[0].replace('ACCESSION: NEW', 'ACCESSION: RIPPOS-LU-0001');
+    const chosen = records[0].replace('ACCESSION: NEW', 'ACCESSION: RIPPOS-0001');
     expect(checkSubmission({ ...good, records: [chosen] })).toMatch(/accession/);
   });
 
@@ -142,13 +142,13 @@ describe('GitHub submissions on the server', () => {
     );
   });
 
-  it('counts every number taken, by records and by open submission branches', () => {
+  it('counts every number taken, by records and by open submission branches, under old and new names', () => {
     expect(
       takenNumbers(
-        ['README.md', 'RIPPOS-LU-0001.txt', 'RIPPOS-LU-0009.txt', 'notes.txt'],
+        ['README.md', 'RIPPOS-LU-0001.txt', 'RIPPOS-0009.txt', 'notes.txt'],
         [
           'refs/heads/submission/rippos-lu-0008-20260513093000',
-          'refs/heads/submission/rippos-lu-0012-0014',
+          'refs/heads/submission/rippos-0012-0014',
           'refs/heads/submission/rippos-lu-0020',
           'refs/heads/main',
         ],
@@ -165,7 +165,7 @@ describe('GitHub submissions on the server', () => {
     const out = await openSubmissionPr(sub, cfg, fetchImpl);
     expect(out).toEqual({
       prUrl: 'https://github.com/own/data/pull/7',
-      accessions: ['RIPPOS-LU-0012', 'RIPPOS-LU-0013'],
+      accessions: ['RIPPOS-0012', 'RIPPOS-0013'],
     });
     expect(calls.map((c) => c.init?.method ?? 'GET')).toEqual([
       'GET', 'GET', 'GET', 'POST', 'PUT', 'PUT', 'POST',
@@ -177,38 +177,38 @@ describe('GitHub submissions on the server', () => {
       ),
     ).toBe(true);
     expect(JSON.parse(calls[3].init!.body as string)).toEqual({
-      ref: 'refs/heads/submission/rippos-lu-0012-0013',
+      ref: 'refs/heads/submission/rippos-0012-0013',
       sha: 'abc123',
     });
-    for (const [n, acc] of [[4, 'RIPPOS-LU-0012'], [5, 'RIPPOS-LU-0013']] as const) {
+    for (const [n, acc] of [[4, 'RIPPOS-0012'], [5, 'RIPPOS-0013']] as const) {
       expect(calls[n].url).toContain(`/contents/RiPP-data/${acc}.txt`);
       const file = JSON.parse(calls[n].init!.body as string);
-      expect(file.branch).toBe('submission/rippos-lu-0012-0013');
+      expect(file.branch).toBe('submission/rippos-0012-0013');
       const text = Buffer.from(file.content, 'base64').toString('utf-8');
       // the record exactly as sent, with only its accession filled in
       expect(text).toBe(records[n - 4].replace('ACCESSION: NEW\n', `ACCESSION: ${acc}\n`));
     }
     const pr = JSON.parse(calls[6].init!.body as string);
-    expect(pr.title).toBe('[Submission] Testamide A (RIPPOS-LU-0012 to RIPPOS-LU-0013)');
-    expect(pr.head).toBe('submission/rippos-lu-0012-0013');
+    expect(pr.title).toBe('[Submission] Testamide A (RIPPOS-0012 to RIPPOS-0013)');
+    expect(pr.head).toBe('submission/rippos-0012-0013');
     expect(pr.base).toBe('main');
     expect(pr.body).toContain('https://orcid.org/0000-0002-7894-3039');
   });
 
   it('moves on to the next numbers when another submission took them a moment ago', async () => {
     const { calls, fetchImpl } = fakeGitHub({
-      taken: new Set(['refs/heads/submission/rippos-lu-0010-0011']),
+      taken: new Set(['refs/heads/submission/rippos-0010-0011']),
     });
     const sub = checkSubmission(good);
     if (typeof sub === 'string') throw new Error(sub);
     const out = await openSubmissionPr(sub, cfg, fetchImpl);
-    expect(out.accessions).toEqual(['RIPPOS-LU-0012', 'RIPPOS-LU-0013']);
+    expect(out.accessions).toEqual(['RIPPOS-0012', 'RIPPOS-0013']);
     const tried = calls
       .filter((c) => c.url.endsWith('/git/refs'))
       .map((c) => JSON.parse(c.init!.body as string).ref);
     expect(tried).toEqual([
-      'refs/heads/submission/rippos-lu-0010-0011',
-      'refs/heads/submission/rippos-lu-0012-0013',
+      'refs/heads/submission/rippos-0010-0011',
+      'refs/heads/submission/rippos-0012-0013',
     ]);
   });
 
@@ -246,8 +246,8 @@ describe('GitHub submissions on the server', () => {
       if (url.includes('/contents/RiPP-data')) {
         return new Response(JSON.stringify([
           { name: 'README.md', sha: 'r', download_url: 'https://raw/README.md' },
-          { name: 'RIPPOS-LU-0002.txt', sha: 'b2', download_url: 'https://raw/2' },
-          { name: 'RIPPOS-LU-0001.txt', sha, download_url: 'https://raw/1' },
+          { name: 'RIPPOS-0002.txt', sha: 'b2', download_url: 'https://raw/2' },
+          { name: 'RIPPOS-0001.txt', sha, download_url: 'https://raw/1' },
         ]), { status: 200 });
       }
       const n = url.endsWith('/1') ? `One ${sha}` : 'Two';
@@ -255,12 +255,12 @@ describe('GitHub submissions on the server', () => {
     }) as typeof fetch;
     const reader = recordReader({ owner: 'own', repo: 'data', base: 'main' }, fetchImpl, 1000);
     expect(await reader.list(0)).toEqual([
-      { accession: 'RIPPOS-LU-0001', title: 'One a1; LC-ESI-QTOF; MS2' },
-      { accession: 'RIPPOS-LU-0002', title: 'Two; LC-ESI-QTOF; MS2' },
+      { accession: 'RIPPOS-0001', title: 'One a1; LC-ESI-QTOF; MS2' },
+      { accession: 'RIPPOS-0002', title: 'Two; LC-ESI-QTOF; MS2' },
     ]);
     expect(asked).toHaveLength(3);
     // within the minute nothing is asked again, and a record is served from what was read
-    expect(await reader.get('RIPPOS-LU-0002', 500)).toContain('Two');
+    expect(await reader.get('RIPPOS-0002', 500)).toContain('Two');
     expect(asked).toHaveLength(3);
     // later the listing is read again; only the file whose content changed is fetched again
     sha = 'a9';
@@ -270,7 +270,7 @@ describe('GitHub submissions on the server', () => {
       'https://raw/1',
     ]);
     expect(await reader.get('../../etc/passwd', 5000)).toBeNull();
-    expect(await reader.get('RIPPOS-LU-0404', 5000)).toBeNull();
+    expect(await reader.get('RIPPOS-0404', 5000)).toBeNull();
   });
 
   it('limits submissions per address over time', () => {

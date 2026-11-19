@@ -28,7 +28,7 @@ type InputProps = {
 function AccessionSearchInputField({
   accession: acc,
   labelText = 'Go to accession:',
-  placeholderText = 'RIPPOS-LU-RP000001',
+  placeholderText = 'RIPPOS-0001',
   style = {},
   inputStyle = {},
   buttonStyle = {},
@@ -62,7 +62,7 @@ function AccessionSearchInputField({
         handleOnClick();
       } else if (e.ctrlKey && e.key === ' ') {
         // If Ctrl + Space is pressed, set the input to a pre-defined example accession
-        setAccession('RIPPOS-LU-RP000001');
+        setAccession('RIPPOS-0001');
       }
     },
     [handleOnClick],
@@ -119,7 +119,7 @@ function AccessionSearchInputField({
         </Content>
         <Tooltip
           title={
-            'Search for an accession id in the database, e.g. RIPPOS-LU-RP000001. Press the button or Enter to search. Use Ctrl + Space to insert the example value into the input field.'
+            'Search for an accession id in the database, e.g. RIPPOS-0001. Press the button or Enter to search. Use Ctrl + Space to insert the example value into the input field.'
           }
         >
           <QuestionCircleTwoTone

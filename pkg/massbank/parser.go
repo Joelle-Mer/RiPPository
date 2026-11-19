@@ -47,10 +47,28 @@ func ScanMbFile(mb2Reader io.Reader, fileName string) (*MassBank2, error) {
 		}
 	}
 	if mb.Accession != nil {
-		c := strings.Split(*mb.Accession, "-")[1]
+		c := contributorOf(*mb.Accession, mb.Authors)
 		mb.Contributor = &c
 	}
 	return &mb, nil
+}
+
+var bracketed = regexp.MustCompile(`\s*\([^)]*\)`)
+
+// contributorOf names who a record comes from. A MassBank accession carries it in its middle part
+// (MSBNK-IPB_Halle-PB001341); a RiPPository accession has none (RIPPOS-0001), so the first author
+// stands in, without the ORCID or anything else in brackets.
+func contributorOf(accession string, authors *[]RecordAuthorName) string {
+	parts := strings.Split(accession, "-")
+	if len(parts) > 2 {
+		return parts[1]
+	}
+	if authors != nil && len(*authors) > 0 {
+		if name := strings.TrimSpace(bracketed.ReplaceAllString((*authors)[0].Name, "")); name != "" {
+			return name
+		}
+	}
+	return parts[0]
 }
 
 const dateFormat = "2006.01.02"

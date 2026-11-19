@@ -29,7 +29,7 @@ func (d oneRecordDB) GetRecords(*[]string) (*[]string, error) {
 	return &[]string{d.storedText}, nil
 }
 
-const record = `ACCESSION: RIPPOS-LU-9999
+const record = `ACCESSION: RIPPOS-9999
 RECORD_TITLE: Testamide A; LC-ESI-QFT; MS2
 DATE: 2026.11.18
 AUTHORS: ORCID:0000-0002-7894-3039
@@ -90,7 +90,7 @@ func TestGetRecordCarriesSpecies(t *testing.T) {
 
 	// the control: without the stored text the species stay empty, as the record page showed them
 	db = oneRecordDB{fromTables: tables}
-	got, err := GetRecord("RIPPOS-LU-9999")
+	got, err := GetRecord("RIPPOS-9999")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestGetRecordCarriesSpecies(t *testing.T) {
 	}
 
 	db = oneRecordDB{fromTables: tables, storedText: stored}
-	got, err = GetRecord("RIPPOS-LU-9999")
+	got, err = GetRecord("RIPPOS-9999")
 	if err != nil {
 		t.Fatal(err)
 	}

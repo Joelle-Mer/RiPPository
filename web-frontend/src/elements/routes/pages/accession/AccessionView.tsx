@@ -5,6 +5,7 @@ import { Button, Spin } from 'antd';
 import useContainerDimensions from '../../../../utils/useContainerDimensions';
 import { Content } from 'antd/es/layout/layout';
 import { useSearchParams } from 'react-router-dom';
+import currentAccession from '../../../../utils/currentAccession';
 import { usePropertiesContext } from '../../../../context/properties/properties';
 import getRecord from '../../../../utils/request/fetchRecord';
 import Text from 'antd/es/typography/Text';
@@ -113,7 +114,7 @@ function AccessionView() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [searchParams] = useSearchParams();
 
-  const accession = searchParams.get('id');
+  const accession = currentAccession(searchParams.get('id'));
   const showRaw = searchParams.get('raw') !== null;
 
   const notFoundElement = useMemo(

@@ -6,7 +6,7 @@ import { calculateSplash } from './chemistry';
 // Expected values from the SPLASH reference implementation (github.com/berlinguyinca/spectra-hash,
 // python/splash), run on the same peaks. Across 2,971 spectra (the RiPPository records, GNPS and
 // litmine spectra, random and tied spectra) the port gave the reference's code every time.
-const RECORD = join(__dirname, '../../../../RiPPository-data/RiPP-data/RIPPOS-LU-0001.txt');
+const RECORD = join(__dirname, '../../../../RiPPository-data/RiPP-data/RIPPOS-0001.txt');
 const peaks = (pairs: number[][]) => pairs.map(([mz, intensity]) => ({ mz, intensity }));
 
 describe('SPLASH', () => {
@@ -33,7 +33,7 @@ describe('SPLASH', () => {
     expect(await calculateSplash([...list].reverse())).toBe(await calculateSplash(list));
   });
 
-  it.skipIf(!existsSync(RECORD))('gives the reference code for RIPPOS-LU-0001', async () => {
+  it.skipIf(!existsSync(RECORD))('gives the reference code for RIPPOS-0001', async () => {
     const lines = readFileSync(RECORD, 'utf-8').split('\n');
     const at = lines.indexOf('PK$PEAK: m/z int. rel.int.');
     const list = lines.slice(at + 1).filter((l) => l.startsWith('  ')).map((l) => l.trim().split(' ').map(Number));
