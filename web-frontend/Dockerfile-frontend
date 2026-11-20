@@ -2,8 +2,10 @@ FROM node:23-alpine AS build
 WORKDIR /app
 # Installing dependencies first can save time on rebuilds
 # We do need the full (dev) dependencies here
-COPY package.json ./
-RUN npm run clean-install
+# Exactly the versions in package-lock.json, the ones tested. A fresh install takes whatever was
+# published that day, and on 2026-11-19 that broke every page (antd's icons in server rendering).
+COPY package.json package-lock.json ./
+RUN npm ci
 # Then copy in the actual sources we need and build
 COPY tsconfig.json tsconfig.node.json vite.config.ts vite-env.d.ts server.ts server-utils.ts server-github.ts index.html entrypoint.sh ./
 COPY src/ ./src/
