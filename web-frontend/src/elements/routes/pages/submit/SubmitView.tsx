@@ -136,6 +136,8 @@ const RIPP_CLASSES = [
   'Lasso peptide',
   'Microcin',
   'Microviridin',
+  'Orbitide',
+  'Proline-rich macrocyclic peptide',
   'Ranthipeptide',
   'RiPP-Unknown',
   'Ryptide',
