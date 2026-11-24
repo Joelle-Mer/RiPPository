@@ -149,6 +149,15 @@ def test_the_example_list_comes_from_the_database(monkeypatch):
     assert client.get("/examples").json() == [{"accession": "A-1", "title": "One; MS2"}]
 
 
+def test_the_example_list_is_in_order_of_the_code(monkeypatch):
+    order = ["RIPPOS-0010", "RIPPOS-0002", "RIPPOS-0001", "RIPPOS-0100", "RIPPOS-0032"]
+    def reply(path):
+        return {"data": [{"accession": a} for a in order]} if "search" in path else {"title": "x"}
+    monkeypatch.setattr(service, "from_rippository", reply)
+    got = [r["accession"] for r in client.get("/examples").json()]
+    assert got == ["RIPPOS-0001", "RIPPOS-0002", "RIPPOS-0010", "RIPPOS-0032", "RIPPOS-0100"]
+
+
 @pytest.mark.parametrize("bad", ["a", "..%2F..%2Fetc", "RIPPOS 1", "x" * 60])
 def test_only_an_accession_reaches_the_database(monkeypatch, bad):
     calls = []

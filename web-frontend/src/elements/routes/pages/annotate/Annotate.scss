@@ -521,6 +521,32 @@ $muted: #586071;
   margin-top: 8px;
 }
 
+// every chain of a sequence search, in a box of its own so a long list does not push the page
+.annotate-expected-runs {
+  max-height: 360px;
+  overflow-y: auto;
+  margin-top: 6px;
+  padding-right: 4px;
+}
+
+.annotate-expected-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+
+  .ant-input-affix-wrapper {
+    flex: 1 1 240px;
+    min-width: 0;
+  }
+
+  .annotate-expected-mod {
+    width: 210px;
+    max-width: 100%;
+  }
+}
+
 .annotate-howto {
   margin-top: 16px;
 

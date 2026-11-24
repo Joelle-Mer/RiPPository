@@ -4,6 +4,7 @@ import {
   CustomEntry,
   CustomRecord,
   ExampleRecord,
+  ExpectedResult,
   GapResult,
   KnownComparison,
   KnownStructure,
@@ -17,6 +18,7 @@ import {
   SavedChain,
   SelectionStep,
   SpectrumRecord,
+  Topology,
 } from './annotateTypes';
 import { chainPath } from './annotateFormat';
 
@@ -52,6 +54,13 @@ function annotateClient(baseUrl: string) {
     },
     examples: async (signal?: AbortSignal) =>
       (await axios.get<ExampleRecord[]>(root + '/examples', { signal })).data,
+    sequenceResidues: async (signal?: AbortSignal) =>
+      (
+        await axios.get<{ label: string; mass: number }[]>(
+          root + '/sequence-residues',
+          { signal },
+        )
+      ).data,
     loadExample: async (accession: string) => {
       const { data } = await axios.post<{ spectra: SpectrumRecord[] }>(
         root + '/examples/' + encodeURIComponent(accession),
@@ -120,6 +129,25 @@ function annotateClient(baseUrl: string) {
           exclude: q.exclude,
           custom: q.custom,
           tolerance: chain.tolerance ?? null,
+        },
+        signal,
+      ),
+    expected: (
+      q: Query,
+      sequence: string,
+      topology: Topology,
+      precursor: { index: number; mz: number; charge: number } | null,
+      signal?: AbortSignal,
+    ) =>
+      post<ExpectedResult>(
+        '/expected',
+        {
+          ...q,
+          sequence,
+          topology,
+          precursor_index: precursor?.index ?? null,
+          precursor_mz: precursor?.mz ?? null,
+          precursor_charge: precursor?.charge ?? 1,
         },
         signal,
       ),

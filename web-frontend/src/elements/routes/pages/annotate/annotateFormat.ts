@@ -2,10 +2,12 @@ import {
   Candidate,
   KnownComparison,
   Neighbour,
+  OrderControl,
   PeakLink,
   PeakPair,
   PrecursorGaps,
   SavedChain,
+  SequenceRun,
   StepMatch,
   SelectionStep,
 } from './annotateTypes';
@@ -336,7 +338,115 @@ function feedbackLinks(
 
 export type { FeedbackKind };
 
+// what the reordering control says about a sequence's fragments; a pass favours the order over
+// most others and never shows it is the only one
+// the end of both verdicts: how many other orders do as well, and what that means
+function orderTail(c: OrderControl, verb: string) {
+  if (c.n_orders === 0) {
+    return 'No other order exists to test against.';
+  }
+  const head = `${c.as_high} of ${c.n_orders} other orders ${verb}`;
+  const weak = c.n_orders < 20 ? ' (few orders: a weak test)' : '';
+  return c.fraction !== null && c.fraction <= 0.05
+    ? `${head}: favours your order, does not prove it${weak}.`
+    : `${head}: does not single out your order${weak}.`;
+}
+
+function orderVerdict(c: OrderControl) {
+  if (c.yours === 0) {
+    return 'No peak is a piece of it: order not tested.';
+  }
+  return orderTail(c, 'score as high');
+}
+
+// what the steps say about a stretch: where it is spelled, and whether other orders are spelled
+// as far; a pass favours the order and never shows it
+function stretchVerdict(nFull: number, longest: number, n: number, c: OrderControl) {
+  const where =
+    nFull > 0
+      ? `Spelled in full at ${nFull} ${nFull === 1 ? 'place' : 'places'}.`
+      : `Not spelled in full; at most ${Math.min(longest, n)} of ${n} in order.`;
+  return `${where} ${orderTail(c, 'spelled as far')}`;
+}
+
+// the chains of a sequence search, drawn on the plot like saved chains (S1, S2… as in the list);
+// ids start at 1000 so they never meet a saved chain's
+const expectedColors = ['#7c3aed', '#0891b2', '#c2410c', '#4338ca', '#be123c', '#0f766e'];
+const expectedFirstId = 1000;
+
+// which chains of a search the plot draws: the longest ones, all, or none
+type ExpectedDraw = 'longest' | 'all' | 'none';
+
+function drawnRun(run: SequenceRun, runs: SequenceRun[], draw: ExpectedDraw) {
+  if (draw === 'none') {
+    return false;
+  }
+  return draw === 'all' || run.residues === (runs[0]?.residues ?? 0);
+}
+
+function expectedChains(
+  runs: SequenceRun[],
+  charge: number,
+  hidden: Set<number>,
+  draw: ExpectedDraw = 'all',
+): SavedChain[] {
+  return runs.flatMap((run, n) =>
+    hidden.has(n) || !drawnRun(run, runs, draw)
+      ? []
+      : [
+          {
+            id: expectedFirstId + n,
+            name: `S${n + 1}`,
+            color: expectedColors[n % expectedColors.length],
+            charge,
+            picks: run.nodes,
+            marks: run.steps.map((step) => ({
+              from: step.from,
+              to: step.to,
+              gap: step.candidate.mass + step.candidate.error_mda / 1000,
+              candidates: [step.candidate],
+              toPrecursor: step.kind === 'pre',
+            })),
+          },
+        ],
+  );
+}
+
+function sequencePositions(positions: number[]) {
+  const list = positions.map((p) => p + 1).join(', ');
+  return positions.length === 1 ? `residue ${list}` : `residues ${list}`;
+}
+
+// how far the precursor is from the sequence: in the chosen unit when close, in Da when it is not
+function precursorMiss(
+  p: { error_mda: number; error_ppm: number },
+  unit: ErrorUnit,
+) {
+  return Math.abs(p.error_mda) >= 1000
+    ? `${signed(p.error_mda / 1000, 4)} Da`
+    : formatError(p, unit);
+}
+
+// put a residue name into the sequence where the cursor is, as a word of its own
+function insertAt(text: string, at: number, word: string) {
+  const before = text.slice(0, at);
+  const after = text.slice(at);
+  const left = before && !/\s$/.test(before) ? ' ' : '';
+  const right = after && !/^\s/.test(after) ? ' ' : '';
+  return `${before}${left}${word}${right}${after}`;
+}
+
+export type { ExpectedDraw };
 export {
+  insertAt,
+  drawnRun,
+  expectedChains,
+  expectedColors,
+  expectedFirstId,
+  orderVerdict,
+  stretchVerdict,
+  precursorMiss,
+  sequencePositions,
   gapMassLabel,
   gapOnlyMarks,
   chainMarks,

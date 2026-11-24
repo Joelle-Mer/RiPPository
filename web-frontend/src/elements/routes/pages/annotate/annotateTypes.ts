@@ -198,8 +198,96 @@ export interface KnownComparison {
   contiguous_run: boolean | null;
 }
 
+// a sequence the user expects, against the spectrum
+// a stretch of the molecule (any length), or the whole molecule, linear or cyclic
+export type Topology = 'stretch' | 'linear' | 'cyclic';
+
+export interface FragmentFit {
+  ion: string;
+  positions: number[];
+  labels: string[];
+  mz: number;
+  error_mda: number;
+  error_ppm: number;
+}
+
+export interface SequenceFragment {
+  peak: number;
+  mz: number;
+  intensity: number;
+  fits: FragmentFit[];
+}
+
+export interface SequenceStep {
+  from: number;
+  to: number;
+  kind: 'one' | 'two' | 'pre';
+  offset: number;
+  positions: number[];
+  candidate: Candidate;
+}
+
+export interface SequenceRun {
+  residues: number;
+  jumps: number;
+  direction: 'forward' | 'backward';
+  nodes: number[];
+  steps: SequenceStep[];
+  positions: number[];
+  labels: string[];
+  to_precursor: boolean;
+  intensity: number;
+  fragment_nodes: number[];
+}
+
+export interface OrderControl {
+  n_orders: number;
+  as_high: number;
+  higher: number;
+  fraction: number | null;
+  median: number | null;
+  max: number | null;
+  yours: number;
+  better: { order: string[]; score: number }[];
+}
+
+export interface ExpectedResult {
+  sequence: { label: string; mass: number }[];
+  topology: Topology;
+  n_residues: number;
+  residue_sum: number;
+  // null for a stretch, whose ends are unknown
+  neutral_mass: number | null;
+  charge: number;
+  limit: string;
+  longest: number;
+  // places where the steps spell every residue in order
+  n_full: number;
+  n_runs: number;
+  runs: SequenceRun[];
+  bonds_covered: [number, number][];
+  n_bonds: number;
+  n_fragment_masses: number;
+  fragments_seen: number;
+  fragments: SequenceFragment[];
+  // fragments are tested only for a whole molecule
+  control: { fragments: OrderControl | null; runs: OrderControl };
+  // for a stretch: the precursor's neutral mass less the stretch's residues
+  rest_of_molecule: number | null;
+  precursor: {
+    measured_neutral: number;
+    error_mda: number;
+    error_ppm: number;
+    within: boolean;
+    hint: string | null;
+    in_runs: boolean;
+  } | null;
+}
+
 export interface SavedChain {
   id: number;
+  // shown beside the chain on the plot instead of its number (S1, S2… for a sequence search)
+  name?: string;
   color: string;
   charge: number;
   tolerance?: Tolerance;

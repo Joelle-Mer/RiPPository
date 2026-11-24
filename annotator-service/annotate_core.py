@@ -17,7 +17,10 @@ from __future__ import annotations
 
 import bisect
 import json
+import math
+import random
 import re
+from collections import Counter
 from pathlib import Path
 
 DATA = Path(__file__).resolve().parent / "data"
@@ -681,6 +684,567 @@ def compare_to_known(steps, known, tolerance=None, class_name="standard",
             "n_inside": sum(1 for s in out if s["kind"] == "inside"),
             "n_no_match": sum(1 for s in out if s["kind"] == "no match"),
             "units_are_residues": uar, "contiguous_run": run}
+
+
+# --- a sequence the user expects ------------------------------------------------------------------
+
+SEQ_MAX = 60
+SHUFFLES = 200
+# every chain is returned, up to a bound that keeps the answer small enough for the page
+RUNS_SHOWN = 500
+ONE_LETTER = {"A": "Ala", "R": "Arg", "N": "Asn", "D": "Asp", "C": "Cys", "Q": "Gln", "E": "Glu",
+              "G": "Gly", "H": "His", "I": "Leu/Ile", "L": "Leu/Ile", "K": "Lys", "M": "Met",
+              "F": "Phe", "P": "Pro", "S": "Ser", "T": "Thr", "W": "Trp", "Y": "Tyr", "V": "Val"}
+ALIASES = {"leu": "Leu/Ile", "ile": "Leu/Ile", "xle": "Leu/Ile"}
+
+
+def _known_labels(class_name, include, exclude, custom):
+    """Every residue a sequence may name: the chosen residues, every residue a set or modification
+    can make, and the user's own."""
+    known = {**VOCAB, **STANDARD}
+    for offered in OFFERED.values():
+        for labels in offered.values():
+            known.update(labels)
+    for s in SETS.values():
+        known.update(s)
+    known.update(alphabet_for(class_name, include, exclude, custom))
+    return known
+
+
+# a residue with a modification in square brackets: Ser[phospho], S[phospho], Ser[-18.0106]
+MODIFIED = re.compile(r"^(.+?)\[([^\[\]]+)\]$")
+SHIFT = re.compile(r"^[+-]\d+(\.\d+)?$")
+
+
+def parse_sequence(text, known):
+    """'GVPVWA', 'Gly Val Pro', 'Gly-Val-Dha' or a mix -> [(label, mass)].
+
+    Words are split on spaces and commas. A word that is a residue name is that residue; one joined
+    by hyphens is split into the longest names that exist (so 'Ala-Thz' stays whole where it is a
+    residue); a word of capital letters is read one letter per residue. Leu and Ile are one residue
+    here, Leu/Ile, because their masses are the same.
+
+    A modification goes in square brackets after its residue, by name where the page offers it on
+    that residue (Ser[phospho], S[dehydration]) or as a mass shift in Da (Ser[-18.0106], M[+15.9949]).
+    """
+    if not isinstance(text, str) or not text.strip():
+        raise AnnotateError("type the sequence you expect")
+    lower = {k.lower(): k for k in known}
+    lower.update({a: v for a, v in ALIASES.items() if v in known})
+    shifted = {}
+
+    def mass_of(lab):
+        return shifted[lab] if lab in shifted else known.get(lab)
+
+    def modified(base, mod):
+        hit = lower.get(f"{base}[{mod}]".lower())
+        if hit:
+            return hit
+        if base not in STANDARD and known.get(base) is None:
+            raise AnnotateError(f"no mass for {base!r}")
+        if SHIFT.fullmatch(mod.strip()):
+            shift = float(mod)
+            label = f"{base}[{shift:+g}]"
+            mass = float(known[base]) + shift
+            if mass <= 0:
+                raise AnnotateError(f"{label} would weigh {mass:.4f} Da; a residue must weigh more "
+                                    f"than nothing")
+            shifted[label] = mass
+            return label
+        offered = sorted({k[len(base) + 1:-1] for k in known if k.startswith(base + "[")})
+        on = f"; on {base}: {', '.join(offered)}" if offered else ""
+        raise AnnotateError(f"{mod!r} is not a modification this page knows on {base}{on}. Or give "
+                            f"its mass shift in Da, e.g. {base}[+15.9949]")
+
+    def name(word):
+        hit = lower.get(word.lower())
+        if hit:
+            return hit
+        m = MODIFIED.fullmatch(word)
+        if m:
+            base = lower.get(m.group(1).lower()) or (
+                ONE_LETTER.get(m.group(1)) if len(m.group(1)) == 1 else None)
+            if base:
+                return modified(base, m.group(2))
+        return None
+
+    # names as they are written (Val, Dha), longest first, for words that run residues together
+    spelled = {k: k for k in known if len(k) > 1 and "[" not in k}
+    spelled.update({a.capitalize(): v for a, v in ALIASES.items() if v in known})
+    by_length = sorted(spelled, key=len, reverse=True)
+
+    def letters(word):
+        """A word of residues run together, each a one-letter code or a name written as named, each
+        with an optional modification: GVPV, GVPVal[methyl], GS[phospho]Dha. Inside such a word a
+        name is matched as written, so a run of capitals stays one-letter codes (GVAL is
+        Gly-Val-Ala-Leu/Ile)."""
+        found, i = [], 0
+        while i < len(word):
+            hit = next((n for n in by_length if word.startswith(n, i)), None)
+            if hit:
+                lab, i = spelled[hit], i + len(hit)
+            elif word[i] in ONE_LETTER:
+                lab, i = ONE_LETTER[word[i]], i + 1
+            else:
+                raise unknown(word, word[i:])
+            if i < len(word) and word[i] == "[":
+                close = word.find("]", i)
+                if close < 0:
+                    raise AnnotateError(f"{word!r}: a '[' is not closed")
+                lab, i = modified(lab, word[i + 1:close]), close + 1
+            found.append(lab)
+        return found
+
+    def unknown(word, rest=None):
+        where = f" (could not read {rest!r})" if rest and rest != word else ""
+        return AnnotateError(f"{word!r} is not a residue this page knows{where}; use three-letter "
+                             f"names or one-letter codes, or add it under Your own residues")
+
+    out = []
+    for word in re.split(r"[\s,;]+", text.strip()):
+        if not word:
+            continue
+        whole = name(word)
+        if whole:
+            out.append(whole)
+            continue
+        # hyphens join residues, except one inside brackets: Ser[-18.0106]
+        parts = [p for p in re.split(r"-(?![^\[]*\])", word) if p]
+        if len(parts) > 1:
+            k = 0
+            while k < len(parts):
+                for end in range(len(parts), k, -1):
+                    hit = name("-".join(parts[k:end]))
+                    if hit:
+                        out.append(hit)
+                        k = end
+                        break
+                else:
+                    out.extend(letters(parts[k]))
+                    k += 1
+            continue
+        out.extend(letters(word))
+    if len(out) < 2:
+        raise AnnotateError("the sequence needs at least two residues")
+    if len(out) > SEQ_MAX:
+        raise AnnotateError(f"{len(out)} residues; at most {SEQ_MAX}")
+    missing = [lab for lab in out if lab not in STANDARD and mass_of(lab) is None]
+    if missing:
+        raise AnnotateError(f"no mass for {missing[0]!r}")
+    return [(lab, float(mass_of(lab))) for lab in out]
+
+
+def sequence_residues(class_name="standard", include=None, exclude=None, custom=None):
+    """The modified and own residues a sequence may name, for the page's picker: name and mass."""
+    known = _known_labels(class_name, include, exclude, custom)
+    return [{"label": lab, "mass": round(float(m), 5)} for lab, m in sorted(known.items())
+            if lab not in STANDARD and m is not None]
+
+
+def _seq_edges(peaks, nodes, labels, z, limit, doubles, pre_node, pre_offsets, pre_mh1):
+    """Steps between peaks that one residue of the sequence (or two, across a missing fragment)
+    fits. Only the residues in the sequence are tried, so its order does not change these steps,
+    and the reorderings of the control are scored on the same steps.
+
+    -> {to_node: [(from_node, kind, key, offset, candidate)]}, kind "one" (key: a label) or "two"
+    (key: a sorted pair of labels) or "pre" (to the precursor; key: a label)."""
+    masses = sorted({lab: m for lab, m in labels}.items(), key=lambda kv: kv[1])
+    fit = _Fit(dict(masses), peaks, z, limit, doubles)
+    pairs = []
+    if doubles:
+        for x in range(len(masses)):
+            for y in range(x, len(masses)):
+                (l1, m1), (l2, m2) = masses[x], masses[y]
+                pairs.append((m1 + m2, tuple(sorted((l1, l2))), ((l1, m1), (l2, m2))))
+    edges = {}
+    lowest = masses[0][1]
+    highest = max([m for _l, m in masses] + [m for m, _k, _p in pairs])
+    for a_pos, a in enumerate(nodes):
+        mz_a = peaks[a][0]
+        for b in nodes[a_pos + 1:]:
+            mz_b = peaks[b][0]
+            d = (mz_b - mz_a) * z
+            t = limit.window(mz_b, z)
+            if d < lowest - t:
+                continue
+            if d > highest + t:
+                break
+            for lab, m in masses:
+                if abs(d - m) <= t:
+                    edges.setdefault(b, []).append(
+                        (a, "one", lab, 0.0, _candidate(lab, m, d, mz_b, z)))
+            for m, key, parts in pairs:
+                if abs(d - m) <= t and fit.middle_missing(mz_a, parts, mz_b):
+                    edges.setdefault(b, []).append(
+                        (a, "two", key, 0.0, _double("+".join(key), m, parts, d, mz_b, z)))
+        if pre_node is not None and pre_mh1 > mz_a:
+            raw = (pre_mh1 - mz_a) * z
+            t = limit.window(pre_mh1, z)
+            for off in pre_offsets:
+                for lab, m in masses:
+                    if abs(raw - off - m) <= t:
+                        c = _candidate(lab, m, raw - off, pre_mh1, z, ppm_digits=2)
+                        edges.setdefault(pre_node, []).append((a, "pre", lab, off, c))
+    return edges
+
+
+def _runs(order, edges, nodes, cyclic, pre_node):
+    """The runs of steps that spell the sequence in its order, read either way along it.
+
+    A run is a chain of peaks whose steps are the residues of a stretch of the sequence one after
+    another, in the order of the sequence going up in m/z (as b-ions grow) or against it (as
+    y-ions grow). In a cyclic sequence the stretch may run on past the last residue to the first.
+    For a linear sequence a step to the precursor must end the stretch where that ion type ends:
+    with the C-terminal residue plus water going forward, with the N-terminal residue going back.
+
+    -> best[node][(pos, dir)] = (residues, -jumps, previous state, edge), the longest run ending at
+    that peak with its last step covering sequence position pos."""
+    n = len(order)
+    where = {}
+    for p, lab in enumerate(order):
+        where.setdefault(lab, []).append(p)
+
+    def step(p, d):
+        q = p + d
+        if cyclic:
+            return q % n
+        return q if 0 <= q < n else None
+
+    best = {}
+    for b in nodes + ([pre_node] if pre_node is not None else []):
+        row = {}
+        for a, kind, key, off, cand in edges.get(b, ()):
+            prev_row = best.get(a, {})
+            for d in (1, -1):
+                if kind in ("one", "pre"):
+                    for p in where.get(key, ()):
+                        if kind == "pre" and not cyclic:
+                            if d == 1 and not (p == n - 1 and off == H2O):
+                                continue
+                            if d == -1 and not (p == 0 and off == 0.0):
+                                continue
+                        elif kind == "pre" and off != 0.0:
+                            continue
+                        q = step(p, -d)
+                        before = prev_row.get((q, d)) if q is not None else None
+                        length = 1 + (before[0] if before else 0)
+                        jumps = -(before[1] if before else 0)
+                        if length > n:
+                            continue
+                        val = (length, -jumps, (a, (q, d)) if before else None, (a, kind, key, off, cand), p)
+                        if (p, d) not in row or val[:2] > row[(p, d)][:2]:
+                            row[(p, d)] = val
+                else:
+                    for p in range(n):
+                        q = step(p, -d)
+                        if q is None or tuple(sorted((order[p], order[q]))) != key:
+                            continue
+                        r = step(q, -d)
+                        before = prev_row.get((r, d)) if r is not None else None
+                        length = 2 + (before[0] if before else 0)
+                        jumps = 1 - (before[1] if before else 0)
+                        if length > n:
+                            continue
+                        val = (length, -jumps, (a, (r, d)) if before else None, (a, kind, key, off, cand), p)
+                        if (p, d) not in row or val[:2] > row[(p, d)][:2]:
+                            row[(p, d)] = val
+        if row:
+            best[b] = row
+    return best
+
+
+def _longest(best):
+    return max((v[0] for row in best.values() for v in row.values()), default=0)
+
+
+def _fragment_ions(order, mass, cyclic, z):
+    """The ions a sequence gives when it breaks once (linear) or twice (cyclic), each with the
+    stretch of the sequence it holds: b-ions of every stretch of a ring, or the b- and y-ions of a
+    chain. -> [(m/z, name, [positions])]. Unlike a step, a fragment's mass depends on the order."""
+    n = len(order)
+    out = []
+    if cyclic:
+        for s in range(n):
+            tot = 0.0
+            for length in range(1, n):
+                p = (s + length - 1) % n
+                tot += mass[order[p]]
+                out.append(((tot + z * PROTON) / z, "b",
+                            [(s + k) % n for k in range(length)]))
+    else:
+        for k in range(1, n):
+            b = sum(mass[lab] for lab in order[:k])
+            y = sum(mass[lab] for lab in order[k:])
+            out.append(((b + z * PROTON) / z, f"b{k}", list(range(k))))
+            out.append(((y + H2O + z * PROTON) / z, f"y{n - k}", list(range(k, n))))
+    return out
+
+
+def _fragments_seen(mzs, ions, limit):
+    """-> {ion index: (peak position in mzs, error in Da)}: every ion with a peak within the limit
+    (the closest peak)."""
+    seen = {}
+    for x, (mz, _name, _pos) in enumerate(ions):
+        w = limit.window(mz)
+        k = bisect.bisect_left(mzs, mz - w)
+        best = None
+        while k < len(mzs) and mzs[k] <= mz + w:
+            e = mzs[k] - mz
+            if best is None or abs(e) < abs(best[1]):
+                best = (k, e)
+            k += 1
+        if best:
+            seen[x] = best
+    return seen
+
+
+def _fragment_score(mzs, ions, limit):
+    """How many distinct fragment masses of the sequence have a peak (a mass two stretches share
+    counts once)."""
+    seen = _fragments_seen(mzs, ions, limit)
+    return len({round(ions[x][0], 4) for x in seen})
+
+
+def _distinct_orders(order, cyclic, rng, k, reverse_same=False):
+    """Up to k reorderings of the same residues, each counted once and none of them the sequence
+    itself. A ring started elsewhere or read the other way round is the same ring here: its pieces
+    have the same masses. A linear sequence reversed is a different one (its b- and y-ions differ),
+    unless only steps are compared (reverse_same), which read a stretch either way."""
+    n = len(order)
+
+    def forms(seq):
+        seq = tuple(seq)
+        out = {seq, seq[::-1]} if reverse_same else {seq}
+        if cyclic:
+            for s in range(n):
+                rot = seq[s:] + seq[:s]
+                out.update({rot, rot[::-1]})
+        return out
+
+    same = forms(order)
+    seen, found = set(), []
+    counts = Counter(order)
+    total = math.factorial(n)
+    for c in counts.values():
+        total //= math.factorial(c)
+    if total <= 4 * k:
+        # every distinct order, without generating the n! orders of repeated residues
+        pool, cur = [], []
+
+        def build():
+            if len(cur) == n:
+                pool.append(tuple(cur))
+                return
+            for lab in sorted(counts):
+                if counts[lab]:
+                    counts[lab] -= 1
+                    cur.append(lab)
+                    build()
+                    cur.pop()
+                    counts[lab] += 1
+
+        build()
+        rng.shuffle(pool)
+    else:
+        pool = None
+    tries = 0
+    while len(found) < k and tries < 50 * k:
+        tries += 1
+        if pool is not None:
+            if not pool:
+                break
+            cand = pool.pop()
+        else:
+            cand = list(order)
+            rng.shuffle(cand)
+            cand = tuple(cand)
+        if cand in same:
+            continue
+        key = min(forms(cand))
+        if key in seen:
+            continue
+        seen.add(key)
+        found.append(list(cand))
+    return found
+
+
+def expected_sequence(peaks, sequence, topology="linear", precursor_index=None, precursor_mz=None,
+                      precursor_charge=1, class_name="standard", charge=1, include=None,
+                      exclude=None, custom=None, tolerance=None, doubles=False, shuffles=SHUFFLES):
+    """A sequence the user expects -> the runs of steps in the spectrum that spell it in order.
+
+    Each step is a gap between two peaks that a residue of the sequence fits within the error
+    limit. A run is a chain of such steps that follow one another in the sequence. The control asks
+    the same of the same residues in other orders: if they make runs as long, the order is not
+    what made the run.
+
+    topology "stretch": the sequence is a part of the molecule, of any length, so nothing is
+    compared with the precursor and no piece's mass can be worked out (what flanks the stretch is
+    unknown); only the steps are searched. "linear" or "cyclic": it is the whole molecule, so its
+    mass is checked against the precursor and the peaks that are its pieces test its order.
+    """
+    if topology not in ("stretch", "linear", "cyclic"):
+        raise AnnotateError("say whether the sequence is a stretch, or the whole molecule, "
+                            "linear or cyclic")
+    whole = topology != "stretch"
+    cyclic = topology == "cyclic"
+    if not peaks:
+        raise AnnotateError("there are no peaks")
+    if precursor_index is not None:
+        _check_index(peaks, precursor_index)
+    limit = error_limit(tolerance)
+    known = _known_labels(class_name, include, exclude, custom)
+    seq = parse_sequence(sequence, known)
+    order = [lab for lab, _m in seq]
+    n = len(seq)
+    total = sum(m for _l, m in seq)
+    expect_neutral = total + (0.0 if cyclic else H2O)
+
+    nodes = [i for i in range(len(peaks)) if i != precursor_index]
+    pre = None
+    if precursor_mz is not None:
+        pre = precursor_point(precursor_mz, precursor_charge)
+    # a stretch has no known way to the precursor, so its runs stay among the peaks
+    pre_node = (precursor_index if (whole and pre is not None and precursor_index is not None)
+                else None)
+    pre_offsets = (0.0,) if cyclic else (0.0, H2O)
+    edges = _seq_edges(peaks, nodes, seq, charge, limit, doubles, pre_node, pre_offsets,
+                       pre["mh1"] if pre else 0.0)
+    best = _runs(order, edges, nodes, cyclic, pre_node)
+
+    # every run of two steps or more that no longer run continues, longest first; a single step
+    # says nothing about order, so it is not listed (it still counts in the control's scores)
+    extended = {v[2] for row in best.values() for v in row.values() if v[2]}
+    runs = []
+    for b, row in best.items():
+        for (p, d), val in row.items():
+            if (b, (p, d)) in extended or val[2] is None:
+                continue
+            chain, state = [], (b, (p, d))
+            while state:
+                node, key = state
+                v = best[node][key]
+                chain.append((node, v))
+                state = v[2]
+            chain.reverse()
+            steps = []
+            for node, v in chain:
+                a, kind, key, off, cand = v[3]
+                cover = [v[4]] if kind != "two" else [(v[4] - d) % n if cyclic else v[4] - d, v[4]]
+                steps.append({"from": a, "to": node, "kind": kind, "offset": round(off, 5),
+                              "positions": cover, "candidate": cand})
+            runs.append({"residues": val[0], "jumps": -val[1], "direction": "forward" if d == 1
+                         else "backward", "nodes": [steps[0]["from"]] + [s["to"] for s in steps],
+                         "steps": steps})
+    runs.sort(key=lambda r: (-r["residues"], r["jumps"], r["nodes"]))
+    # the same peaks read as another stretch of the sequence (a repeated residue) are one run
+    kept, covered = [], []
+    for r in runs:
+        ns = frozenset(r["nodes"])
+        if any(ns <= c for c in covered[:500]):
+            continue
+        covered.append(ns)
+        kept.append(r)
+    for r in kept:
+        pos = [p for s in r["steps"] for p in s["positions"]]
+        r["positions"] = pos
+        r["labels"] = [order[p] for p in pos]
+        r["to_precursor"] = r["steps"][-1]["kind"] == "pre"
+        r["intensity"] = round(sum(peaks[i][1] for i in r["nodes"] if i != precursor_index), 3)
+    # the score the control compares: the most residues in one run, a single step included
+    longest = _longest(best)
+
+    # bonds between neighbouring residues that a run of two or more residues steps across
+    bonds = set()
+    for r in kept:
+        pos = r["positions"]
+        for x, y in zip(pos, pos[1:]):
+            bonds.add(tuple(sorted((x, y))) if not (cyclic and {x, y} == {0, n - 1})
+                      else (n - 1, 0))
+    n_bonds = n if cyclic else n - 1
+
+    # peaks at the mass of a piece of the sequence: these depend on the order, steps do not
+    mass = {lab: m for lab, m in seq}
+    frag_nodes = sorted(nodes, key=lambda i: peaks[i][0])
+    mzs = [peaks[i][0] for i in frag_nodes]
+    ions = _fragment_ions(order, mass, cyclic, charge) if whole else []
+    seen = _fragments_seen(mzs, ions, limit)
+    by_peak = {}
+    for x, (k, e) in seen.items():
+        mz, name, pos = ions[x]
+        i = frag_nodes[k]
+        by_peak.setdefault(i, []).append({
+            "ion": name, "positions": pos, "labels": [order[p] for p in pos],
+            "mz": round(mz, 5), "error_mda": round(e * 1000, 2),
+            "error_ppm": round(ppm_of(e, mz), 1)})
+    fragments = []
+    for i, fits in sorted(by_peak.items(), key=lambda kv: peaks[kv[0]][0]):
+        fits.sort(key=lambda f: (len(f["positions"]), abs(f["error_mda"])))
+        fragments.append({"peak": i, "mz": peaks[i][0], "intensity": peaks[i][1],
+                          "fits": fits})
+    frag_score = len({round(ions[x][0], 4) for x in seen})
+    frag_peaks = set(by_peak)
+    for r in kept:
+        r["fragment_nodes"] = [i for i in r["nodes"] if i in frag_peaks]
+
+    seed = sum(ord(ch) * (k + 1) for k, ch in enumerate("|".join(order) + topology))
+    rng = random.Random(seed)
+    # a stretch is read either way along it, so read backwards it is the same stretch
+    others = _distinct_orders(order, cyclic, rng, max(0, int(shuffles)),
+                              reverse_same=not whole)
+    run_scores = [_longest(_runs(o, edges, nodes, cyclic, pre_node)) for o in others]
+    frag_scores = ([_fragment_score(mzs, _fragment_ions(o, mass, cyclic, charge), limit)
+                    for o in others] if whole else [])
+
+    def summary(mine, scores):
+        if not scores:
+            return {"n_orders": 0, "as_high": 0, "higher": 0, "fraction": None, "median": None,
+                    "max": None, "yours": mine, "better": []}
+        as_high = sum(1 for s in scores if s >= mine)
+        # the orders that do better than yours, best first: worth a look, not an answer
+        better = sorted(((s, o) for s, o in zip(scores, others) if s > mine),
+                        key=lambda so: (-so[0], so[1]))[:3]
+        return {"n_orders": len(scores), "as_high": as_high,
+                "higher": sum(1 for s in scores if s > mine),
+                "fraction": round(as_high / len(scores), 3),
+                "median": sorted(scores)[len(scores) // 2], "max": max(scores), "yours": mine,
+                "better": [{"order": o, "score": s} for s, o in better]}
+
+    out = {"sequence": [{"label": lab, "mass": round(m, 5)} for lab, m in seq],
+           "topology": topology, "n_residues": n, "residue_sum": round(total, 5),
+           "neutral_mass": round(expect_neutral, 5) if whole else None, "charge": charge,
+           "limit": limit.describe(), "longest": longest,
+           # places where the steps spell the whole stretch, every residue in order
+           "n_full": sum(1 for r in kept if r["residues"] == n),
+           "n_runs": len(kept), "runs": kept[:RUNS_SHOWN],
+           "bonds_covered": [list(b) for b in sorted(bonds)], "n_bonds": n_bonds,
+           "n_fragment_masses": len({round(mz, 4) for mz, _n, _p in ions}),
+           "fragments_seen": frag_score, "fragments": fragments,
+           "control": {"fragments": summary(frag_score, frag_scores) if whole else None,
+                       "runs": summary(longest, run_scores)},
+           "precursor": None, "rest_of_molecule": None}
+    if pre is not None and not whole:
+        # what the precursor leaves for the rest of the molecule: information, not a check
+        out["rest_of_molecule"] = round(pre["neutral"] - total, 5)
+    if pre is not None and whole:
+        err = pre["neutral"] - expect_neutral
+        ref = pre["mh1"]
+        w = limit.window(ref)
+        hint = None
+        if abs(err) > w:
+            # a difference the page can name: one water is the other topology
+            for off, why in ((-H2O, "one water less than a linear peptide: is it cyclic?"),
+                             (H2O, "one water more than a ring: is it linear?"),
+                             (PROTON, "one proton: is the precursor stored as the neutral "
+                                      "mass?")):
+                if abs(err - off) <= w:
+                    hint = why
+                    break
+        out["precursor"] = {"measured_neutral": pre["neutral"], "error_mda": round(err * 1000, 2),
+                            "error_ppm": round(ppm_of(err, ref), 2),
+                            "within": abs(err) <= w, "hint": hint,
+                            "in_runs": pre_node is not None}
+    return out
 
 
 # --- reading spectra ------------------------------------------------------------------------------

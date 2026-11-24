@@ -21,6 +21,7 @@ import FileSaver from 'file-saver';
 const { saveAs } = FileSaver;
 import { usePropertiesContext } from '../../../../context/properties/properties';
 import AnnotateAlphabet from './AnnotateAlphabet';
+import AnnotateExpected from './AnnotateExpected';
 import AnnotateFeedback from './AnnotateFeedback';
 import AnnotateKnown from './AnnotateKnown';
 import AnnotateSimilar from './AnnotateSimilar';
@@ -36,6 +37,9 @@ import { annotateClient, messageOf } from './annotateApi';
 import {
   chainMarks,
   chargeOf,
+  expectedChains,
+  type ExpectedDraw,
+  expectedFirstId,
   errorIn,
   ErrorUnit,
   formatMz,
@@ -56,6 +60,7 @@ import {
   SavedChain,
   SpectrumRecord,
   Tolerance,
+  Topology,
 } from './annotateTypes';
 
 const standardClass = 'standard';
@@ -130,10 +135,18 @@ function AnnotateView() {
   const [savedBySpectrum, setSavedBySpectrum] = useState<
     Record<number, SavedChain[]>
   >({});
+  // a sequence the user expects; searched only when they press Search, then kept up to date
+  const [sequence, setSequence] = useState('');
+  const [topology, setTopology] = useState<Topology>('stretch');
+  const [searched, setSearched] = useState<{
+    sequence: string;
+    topology: Topology;
+  } | null>(null);
 
   const meta = useRequest(client.meta);
   const examples = useRequest(client.examples);
   const alphabet = useRequest(client.alphabet);
+  const modifiedResidues = useRequest(client.sequenceResidues);
 
   const className = useMemo(
     () => (classNames.length > 0 ? classNames : standardClass),
@@ -252,6 +265,52 @@ function AnnotateView() {
       precursorPicked,
       query,
     ],
+  );
+
+  const expectedRun = useMemo(
+    () =>
+      query && searched
+        ? (s: AbortSignal) =>
+            client.expected(
+              query,
+              searched.sequence,
+              searched.topology,
+              precursorMz !== null && precursorIndex >= 0
+                ? {
+                    index: precursorIndex,
+                    mz: precursorMz,
+                    charge: precursorCharge,
+                  }
+                : null,
+              s,
+            )
+        : null,
+    [
+      client,
+      precursorCharge,
+      precursorIndex,
+      precursorMz,
+      query,
+      searched,
+    ],
+  );
+  const expected = useRequest(expectedRun);
+  // every chain of the search is drawn on the plot unless switched off, or hidden one by one
+  // the longest by default: dozens of rows above the plot would push the spectrum off the screen
+  const [expectedOnPlot, setExpectedOnPlot] = useState<ExpectedDraw>('longest');
+  const [hiddenRuns, setHiddenRuns] = useState<Set<number>>(new Set());
+  useEffect(() => setHiddenRuns(new Set()), [expected.data]);
+  const plotExpected = useMemo(
+    () =>
+      expected.data
+        ? expectedChains(
+            expected.data.runs,
+            expected.data.charge,
+            hiddenRuns,
+            expectedOnPlot,
+          )
+        : [],
+    [expected.data, expectedOnPlot, hiddenRuns],
   );
 
   // the closest records in the database, for the measured peaks alone (the precursor point is not one)
@@ -520,6 +579,11 @@ function AnnotateView() {
     [stored, view],
   );
   const hiddenChains = stored.length - saved.length;
+  // what the plot draws: the saved chains, then the chains of a sequence search
+  const plotSaved = useMemo(
+    () => [...saved, ...plotExpected],
+    [plotExpected, saved],
+  );
 
   const handleSaveChain = useCallback(() => {
     if (!view) {
@@ -903,7 +967,7 @@ function AnnotateView() {
                 value={example ?? undefined}
                 options={(examples.data ?? []).map((record) => ({
                   value: record.accession,
-                  label: `${record.title.split(';')[0]} · ${record.accession}`,
+                  label: `${record.accession} · ${record.title.split(';')[0]}`,
                 }))}
                 onChange={handleExample}
                 showSearch
@@ -1095,7 +1159,7 @@ function AnnotateView() {
                 neighbours={plotNeighbours}
                 steps={shownSteps}
                 links={shownLinks}
-                saved={saved}
+                saved={plotSaved}
                 highlight={highlight}
                 svgRef={svgRef}
                 onTogglePeak={handleToggle}
@@ -1105,7 +1169,14 @@ function AnnotateView() {
                 onGapMassChange={setGapMass}
                 doubles={doubles}
                 onDoublesChange={setDoubles}
-                onRemoveSaved={handleDeleteChain}
+                onRemoveSaved={(id) =>
+                  id >= expectedFirstId
+                    ? setHiddenRuns(
+                        (current) =>
+                          new Set([...current, id - expectedFirstId]),
+                      )
+                    : handleDeleteChain(id)
+                }
               />
               <div className="annotate-selection">
                 {ordered.length === 0 && (
@@ -1181,6 +1252,42 @@ function AnnotateView() {
 
             <div className="annotate-columns">
               <div className="annotate-results">
+                <AnnotateExpected
+                  sequence={sequence}
+                  topology={topology}
+                  onSequenceChange={setSequence}
+                  modified={modifiedResidues.data ?? []}
+                  onTopologyChange={(value) => {
+                    setTopology(value);
+                    if (searched) {
+                      setSearched({ ...searched, topology: value });
+                    }
+                  }}
+                  onSearch={() =>
+                    setSearched({ sequence: sequence.trim(), topology })
+                  }
+                  onClear={() => setSearched(null)}
+                  searched={searched !== null}
+                  remote={expected}
+                  peaks={peaks}
+                  precursorIndex={precursorIndex}
+                  onPick={handleUseChain}
+                  onHover={setHighlight}
+                  onPlot={expectedOnPlot}
+                  onPlotChange={setExpectedOnPlot}
+                  hiddenRuns={hiddenRuns}
+                  onToggleRun={(n) =>
+                    setHiddenRuns((current) => {
+                      const next = new Set(current);
+                      if (next.has(n)) {
+                        next.delete(n);
+                      } else {
+                        next.add(n);
+                      }
+                      return next;
+                    })
+                  }
+                />
                 {saved.length > 0 && (
                   <SavedPanel
                     chains={saved}
@@ -1285,6 +1392,12 @@ function AnnotateView() {
               of picks. Saved chains are drawn on the plot in their own colour,
               and can be loaded, or removed with the × beside them or the Remove
               button in their list.
+            </li>
+            <li>
+              Expected sequence: type a stretch you expect (modifications in
+              brackets, S[phospho] or S[-18.0106]) and press Search to see where
+              the steps spell it. Choose Whole, linear or cyclic to also check
+              the precursor. Other orders of the same residues are tried too.
             </li>
             <li>
               At the top you can set the error limit, in mDa or in ppm of the

@@ -675,7 +675,7 @@ function AnnotateSpectrum({
           fontWeight={600}
           fill={chain.color}
         >
-          {`${chain.id} (${chain.charge}+)`}
+          {chain.name ?? `${chain.id} (${chain.charge}+)`}
         </text>
         {/* remove this saved chain; left out of the downloaded figure */}
         <text
@@ -683,7 +683,11 @@ function AnnotateSpectrum({
           data-testid={'annotate-remove-saved-' + chain.id}
           role="button"
           tabIndex={0}
-          aria-label={`Remove saved chain ${chain.id}`}
+          aria-label={
+            chain.name
+              ? `Hide ${chain.name} from the plot`
+              : `Remove saved chain ${chain.id}`
+          }
           x={4}
           y={level + 4}
           fontSize={13}
@@ -698,7 +702,12 @@ function AnnotateSpectrum({
             }
           }}
         >
-          <title>Remove saved chain {chain.id}</title>×
+          <title>
+            {chain.name
+              ? `Hide ${chain.name} from the plot`
+              : `Remove saved chain ${chain.id}`}
+          </title>
+          ×
         </text>
         {shownMarks(chain).map((mark, m) => {
           const markLevel = level + lanes[m] * savedRow;

@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  expectedChains,
+  expectedFirstId,
+  insertAt,
+  orderVerdict,
+  precursorMiss,
+  sequencePositions,
+  stretchVerdict,
   gapMassLabel,
   gapOnlyMarks,
   isJump,
@@ -24,6 +31,111 @@ import {
   withPrecursor,
 } from './annotateFormat';
 import { PeakPair } from './annotateTypes';
+
+describe('expected sequence wording', () => {
+  const control = (over: Partial<Parameters<typeof orderVerdict>[0]>) => ({
+    n_orders: 200,
+    as_high: 0,
+    higher: 0,
+    fraction: 0,
+    median: 3,
+    max: 5,
+    yours: 9,
+    better: [],
+    ...over,
+  });
+
+  it('never words a pass as proof of the order', () => {
+    const text = orderVerdict(control({}));
+    expect(text).toContain('favours your order, does not prove it');
+    expect(text).not.toMatch(/confirm|correct|shows/i);
+  });
+
+  it('says plainly when other orders do as well', () => {
+    const text = orderVerdict(control({ as_high: 80, fraction: 0.4 }));
+    expect(text).toContain('80 of 200');
+    expect(text).toContain('does not single out your order');
+    expect(text).not.toContain('favour');
+  });
+
+  it('warns that a few possible orders make a weak test', () => {
+    expect(orderVerdict(control({ n_orders: 5, fraction: 0 }))).toContain('weak test');
+    expect(orderVerdict(control({}))).not.toContain('weak test');
+  });
+
+  it('cannot judge an order with no fragment or no alternative', () => {
+    expect(orderVerdict(control({ yours: 0 }))).toContain('order not tested');
+    expect(orderVerdict(control({ n_orders: 0, fraction: null }))).toContain(
+      'No other order exists',
+    );
+  });
+
+  it('says where a stretch is spelled and never words a pass as proof', () => {
+    const full = stretchVerdict(2, 4, 4, control({ fraction: 0.01, as_high: 2 }));
+    expect(full).toContain('Spelled in full at 2 places');
+    expect(full).toContain('does not prove it');
+    expect(full).not.toMatch(/confirm|correct|shows/i);
+    const none = stretchVerdict(0, 2, 5, control({ fraction: 0.6, as_high: 120 }));
+    expect(none).toContain('Not spelled in full');
+    expect(none).toContain('2 of 5 in order');
+    expect(none).toContain('does not single out your order');
+  });
+
+  it('draws every chain of a search as S1, S2… and leaves out the hidden ones', () => {
+    const cand = { label: 'Val', mass: 99.06841, error_mda: 0.2, error_ppm: 1 };
+    const run = (from: number) => ({
+      residues: 2,
+      jumps: 0,
+      direction: 'forward' as const,
+      nodes: [from, from + 1, from + 2],
+      steps: [
+        { from, to: from + 1, kind: 'one' as const, offset: 0, positions: [0], candidate: cand },
+        { from: from + 1, to: from + 2, kind: 'one' as const, offset: 0, positions: [1], candidate: cand },
+      ],
+      positions: [0, 1],
+      labels: ['Val', 'Val'],
+      to_precursor: false,
+      intensity: 1,
+      fragment_nodes: [],
+    });
+    const all = expectedChains([run(0), run(3), run(6)], 1, new Set());
+    expect(all.map((c) => c.name)).toEqual(['S1', 'S2', 'S3']);
+    expect(all.every((c) => c.id >= expectedFirstId)).toBe(true);
+    expect(all[1].marks.map((m) => [m.from, m.to])).toEqual([
+      [3, 4],
+      [4, 5],
+    ]);
+    expect(all[0].marks[0].gap).toBeCloseTo(99.06861, 5);
+    const some = expectedChains([run(0), run(3), run(6)], 1, new Set([1]));
+    expect(some.map((c) => c.name)).toEqual(['S1', 'S3']);
+    // 'longest' draws only the chains as long as the first; 'none' draws nothing
+    const short = { ...run(9), residues: 1 };
+    const longest = expectedChains([run(0), run(3), short], 1, new Set(), 'longest');
+    expect(longest.map((c) => c.name)).toEqual(['S1', 'S2']);
+    expect(expectedChains([run(0)], 1, new Set(), 'none')).toEqual([]);
+  });
+
+  it('puts a picked residue in at the cursor as a word of its own', () => {
+    expect(insertAt('GV PV', 2, 'Ser[phospho]')).toBe('GV Ser[phospho] PV');
+    expect(insertAt('GVPV', 2, 'Dha')).toBe('GV Dha PV');
+    expect(insertAt('GVPV', 4, 'Dha')).toBe('GVPV Dha');
+    expect(insertAt('', 0, 'Dha')).toBe('Dha');
+  });
+
+  it('numbers residues from one', () => {
+    expect(sequencePositions([0, 5, 1])).toBe('residues 1, 6, 2');
+    expect(sequencePositions([3])).toBe('residue 4');
+  });
+
+  it('gives a large precursor miss in Da', () => {
+    expect(precursorMiss({ error_mda: -18010.54, error_ppm: -29500 }, 'mDa')).toBe(
+      '−18.0105 Da',
+    );
+    expect(precursorMiss({ error_mda: 0.02, error_ppm: 0.03 }, 'mDa')).toBe(
+      '+0.02 mDa',
+    );
+  });
+});
 
 describe('withPrecursor', () => {
   const peaks: PeakPair[] = [

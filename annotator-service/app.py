@@ -99,6 +99,15 @@ class PrecursorQuery(Query):
     precursor_charge: int = Field(default=1, ge=1, le=MAX_CHARGE)
 
 
+class ExpectedQuery(Query):
+    sequence: str = Field(min_length=1, max_length=600)
+    # a stretch of the molecule (any length), or the whole molecule, linear or cyclic
+    topology: str = Field(default="stretch", pattern="^(stretch|linear|cyclic)$")
+    precursor_index: int | None = None
+    precursor_mz: float | None = Field(default=None, gt=0, allow_inf_nan=False)
+    precursor_charge: int = Field(default=1, ge=1, le=MAX_CHARGE)
+
+
 class KnownComparison(BaseModel):
     steps: list[dict] = Field(min_length=1, max_length=200)
     known: dict
@@ -129,6 +138,12 @@ def meta():
 @app.get("/alphabet")
 def alphabet(class_name: str = "standard"):
     return core.alphabet_for(class_name)
+
+
+@app.get("/sequence-residues")
+def sequence_residues():
+    """Every modified residue an expected sequence may name, for the page's picker."""
+    return core.sequence_residues()
 
 
 @app.post("/custom-residues")
@@ -247,7 +262,9 @@ def examples():
     for hit in hits:
         record = from_rippository(f"/records/{hit['accession']}/simple")
         found.append({"accession": hit["accession"], "title": record.get("title") or ""})
-    return found
+    # in order of the code (RIPPOS-0001 first), numbers compared as numbers
+    return sorted(found, key=lambda r: [int(p) if p.isdigit() else p
+                                        for p in re.split(r"(\d+)", r["accession"])])
 
 
 @app.post("/examples/{accession}")
@@ -374,6 +391,17 @@ def precursor_gaps(q: PrecursorQuery):
     return {"precursor": res["precursor"],
             "matches": [{"peak": peak, "hypotheses": readings}
                         for peak, readings in grouped.items()]}
+
+
+@app.post("/expected")
+def expected(q: ExpectedQuery):
+    """A sequence the user expects, linear or cyclic, against the spectrum: the peaks that are its
+    fragments, the runs of steps that spell it in order, and how other orders of the same residues
+    do on both."""
+    if (q.precursor_index is None) != (q.precursor_mz is None):
+        raise HTTPException(422, "give the precursor's place among the peaks and its m/z together")
+    return core.expected_sequence(q.peaks, q.sequence, q.topology, q.precursor_index,
+                                  q.precursor_mz, q.precursor_charge, **q.alphabet_args())
 
 
 @app.post("/compare-known")
