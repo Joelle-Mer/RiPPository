@@ -334,9 +334,16 @@ def similar(q: SimilarQuery):
     """The closest records in the database, from the site's own spectral search, best first, each
     with its peaks and the peaks the two spectra share, for a mirror plot. A rank, not an identity."""
     scores = similarity_search(q.peaks, q.precursor_mz)
-    results = []
-    for hit in scores[:SIMILAR_SHOWN]:
+    results, missing = [], []
+    for hit in scores:
+        if len(results) == SIMILAR_SHOWN:
+            break
         record = from_rippository(f"/records/{hit['accession']}")
+        # the search reads the record files when it starts, so it can name a record the database
+        # no longer has (renamed or removed); the API then answers with text, not a record
+        if not isinstance(record, dict) or not (record.get("peak") or {}).get("peak"):
+            missing.append(hit["accession"])
+            continue
         names = (record.get("compound") or {}).get("names") or [hit["accession"]]
         ref_peaks = [[p["mz"], p["intensity"]] for p in record["peak"]["peak"]["values"]]
         ref_pre = stored_precursor(record)
@@ -353,7 +360,7 @@ def similar(q: SimilarQuery):
                         "n_query_peaks": len(q.peaks),
                         "precursor_shift": round(shift, 4) if shift is not None else None,
                         "tolerance": PAIR_TOLERANCE})
-    return {"results": results, "n_scored": len(scores),
+    return {"results": results, "n_scored": len(scores), "missing": missing,
             "method": "modified cosine" if q.precursor_mz else "cosine"}
 
 

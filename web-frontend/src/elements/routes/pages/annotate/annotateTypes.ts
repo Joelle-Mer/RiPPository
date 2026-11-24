@@ -326,5 +326,7 @@ export interface SimilarRecord {
 export interface SimilarResult {
   results: SimilarRecord[];
   n_scored: number;
+  // matches the database no longer has, left out
+  missing?: string[];
   method: 'modified cosine' | 'cosine';
 }

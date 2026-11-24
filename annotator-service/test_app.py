@@ -420,7 +420,22 @@ def test_similar_takes_the_scores_from_the_sites_search(monkeypatch):
 def test_similar_without_a_precursor_uses_plain_cosine(monkeypatch):
     monkeypatch.setattr(service, "similarity_search", lambda peaks, pre: [])
     r = client.post("/similar", json={"peaks": QUERY}).json()
-    assert r == {"results": [], "n_scored": 0, "method": "cosine"}
+    assert r == {"results": [], "n_scored": 0, "missing": [], "method": "cosine"}
+
+
+def test_a_match_the_database_no_longer_has_is_skipped_and_named(monkeypatch):
+    """The search can name a record renamed since it started; the API answers it with text."""
+    monkeypatch.setattr(service, "similarity_search", lambda peaks, pre: [
+        {"accession": "OLD-1", "similarity_score": 0.9},
+        {"accession": "A-SAME", "similarity_score": 0.8}])
+    library = {"A-SAME": _record("A-SAME", QUERY, stated=300.0)}
+    monkeypatch.setattr(service, "from_rippository",
+                        lambda path: library.get(path.rsplit("/", 1)[1],
+                                                 "sql: no rows in result set"))
+    r = client.post("/similar", json={"peaks": QUERY, "precursor_mz": 300.0})
+    assert r.status_code == 200
+    assert [x["accession"] for x in r.json()["results"]] == ["A-SAME"]
+    assert r.json()["missing"] == ["OLD-1"]
 
 
 def test_an_unreachable_search_is_explained(monkeypatch):

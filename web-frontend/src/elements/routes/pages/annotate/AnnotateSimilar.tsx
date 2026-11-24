@@ -144,15 +144,27 @@ function SimilarBody({
   const [chosen, setChosen] = useState<string | null>(null);
   const picked =
     result.results.find((r) => r.accession === chosen) ?? result.results[0];
+  // the search reads the records when it starts, so it can name records since renamed or removed
+  const stale =
+    result.missing && result.missing.length > 0 ? (
+      <p className="annotate-hint">
+        The spectral search is out of date: {result.missing.length} of its
+        matches are no longer in RiPPository and are left out.
+      </p>
+    ) : null;
   if (result.results.length === 0) {
     return (
-      <p className="annotate-empty">
-        No record in RiPPository shares peaks with this spectrum.
-      </p>
+      <>
+        {stale}
+        <p className="annotate-empty">
+          No record in RiPPository shares peaks with this spectrum.
+        </p>
+      </>
     );
   }
   return (
     <>
+      {stale}
       <p className="annotate-hint">
         The closest of {result.n_scored} records in RiPPository, from the
         site&apos;s spectral search ({result.method}, peaks matched within{' '}
